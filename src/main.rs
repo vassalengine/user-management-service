@@ -72,7 +72,9 @@ mod test {
     #[test]
     fn login_no_content_type() {
         let client = Client::tracked(rocket()).unwrap();
-        let response = client.post(uri!(API_V1, login))
+        let base = uri!("/api/v1");
+        let response = client.post(uri!(base, login))
+            .body("{ \"username\": \"bob\", \"password\": 12345 }")
             .dispatch();
 
         assert_eq!(response.status(), Status::BadRequest);
@@ -88,9 +90,11 @@ mod test {
     #[test]
     fn login_no_payload() {
         let client = Client::tracked(rocket()).unwrap();
-        let response = client.post(uri!(API_V1, login))
+        let base = uri!("/api/v1");
+        let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
             .dispatch();
+
         assert_eq!(response.status(), Status::BadRequest);
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         assert_eq!(
@@ -104,7 +108,8 @@ mod test {
     #[test]
     fn login_not_json() {
         let client = Client::tracked(rocket()).unwrap();
-        let response = client.post(uri!(API_V1, login))
+        let base = uri!("/api/v1");
+        let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
             .body("total garbage")
             .dispatch();
@@ -121,7 +126,8 @@ mod test {
     #[test]
     fn login_no_password() {
         let client = Client::tracked(rocket()).unwrap();
-        let response = client.post(uri!(API_V1, login))
+        let base = uri!("/api/v1");
+        let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
             .body("{ \"username\": \"bob\" }")
             .dispatch();
@@ -138,7 +144,8 @@ mod test {
     #[test]
     fn login_username_not_string() {
         let client = Client::tracked(rocket()).unwrap();
-        let response = client.post(uri!(API_V1, login))
+        let base = uri!("/api/v1");
+        let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
             .body("{ \"username\": 3, \"password\": \"12345\" }")
             .dispatch();
@@ -155,7 +162,8 @@ mod test {
     #[test]
     fn login_no_username() {
         let client = Client::tracked(rocket()).unwrap();
-        let response = client.post(uri!(API_V1, login))
+        let base = uri!("/api/v1");
+        let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
             .body("{ \"password\": \"12345\" }")
             .dispatch();
@@ -172,9 +180,10 @@ mod test {
     #[test]
     fn login_password_not_string() {
         let client = Client::tracked(rocket()).unwrap();
-        let response = client.post(uri!(API_V1, login))
+        let base = uri!("/api/v1");
+        let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
-            .body("{ \"username\": \"bob\", \"password\": 12345 }")
+            .body("{ \"username\": \"skroob\", \"password\": 12345 }")
             .dispatch();
         assert_eq!(response.status(), Status::UnprocessableEntity);
         assert_eq!(response.content_type(), Some(ContentType::JSON));
@@ -189,9 +198,10 @@ mod test {
     #[test]
     fn login_ok() {
         let client = Client::tracked(rocket()).unwrap();
-        let response = client.post(uri!(API_V1, login))
+        let base = uri!("/api/v1");
+        let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
-            .body("{ \"username\": \"bob\", \"password\": \"12345\" }")
+            .body("{ \"username\": \"skroob\", \"password\": \"12345\" }")
             .dispatch();
         assert_eq!(response.status(), Status::NotImplemented);
         assert_eq!(response.content_type(), Some(ContentType::JSON));
@@ -202,5 +212,4 @@ mod test {
             })
         );
     }
-
 }
