@@ -1,0 +1,21 @@
+[package]
+name = "gls"
+version = "0.1.0"
+authors = ["Joel Uckelman <uckelman@nomic.net>"]
+description = "Vassal Game Library Service"
+license = "GPL-3.0-or-later"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+reqwest = { version = "*", features = ["cookies", "json"] }
+rocket = { version = ">=0.5.0-rc.3", features = ["json"] }
+serde = "*"
+serde_json = "*"
+
+[dev-dependencies]
+const_format = "*"
+tokio = "*"
+tokio-test = "*"
+wiremock = "*"
