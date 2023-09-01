@@ -2,11 +2,13 @@
 
 pub mod discourse;
 
-use rocket::{Request, catch, catchers, get, launch, post, routes, uri};
-use rocket::http::{Status, uri::Origin};
-use rocket::serde::{
-    Deserialize, Serialize,
-    json::{Json, Value, json}
+use rocket::{
+    Request, catch, catchers, get, launch, post, routes, uri,
+    http::Status,
+    serde::{
+        Deserialize, Serialize,
+        json::{Json, Value, json}
+    }
 };
 
 #[catch(default)]
