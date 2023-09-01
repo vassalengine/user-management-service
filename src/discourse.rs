@@ -16,7 +16,7 @@ impl From<reqwest::Error> for Error {
         Error {
             status: e.status().map(|s| s.as_u16()),
             message: e.to_string()
-        }   
+        }
     }
 }
 
@@ -49,7 +49,7 @@ async fn get_csrf(client: &Client, url: &str) -> Result<(String, String), Error>
         return Err(Error::from(response).await);
     }
 
-    // collect the returned cookies 
+    // collect the returned cookies
     let cookies = response.cookies()
         .map(|c| format!("{}={}", c.name(), c.value()))
         .collect::<Vec<String>>()
