@@ -161,6 +161,7 @@ mod test {
         Mock::given(matchers::method(method))
             .and(matchers::path(endpoint))
             .respond_with(rt)
+            .expect(1)
             .mount(&mock_server)
             .await;
 
@@ -431,12 +432,14 @@ mod test {
         Mock::given(matchers::method("GET"))
             .and(matchers::path(CSRF_ENDPOINT))
             .respond_with(csrf_rt)
+            .expect(1)
             .mount(&mock_server)
             .await;
 
         Mock::given(matchers::method("POST"))
             .and(matchers::path(LOGIN_ENDPOINT))
             .respond_with(login_rt)
+            .expect(1)
             .mount(&mock_server)
             .await;
 
