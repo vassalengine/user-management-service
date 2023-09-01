@@ -413,7 +413,6 @@ mod test {
 
     #[tokio::test]
     async fn discourse_auth_ok() {
-
         let csrf_rt = ResponseTemplate::new(200)
             .insert_header(
                 "Set-Cookie",
