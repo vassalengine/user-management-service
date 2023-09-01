@@ -104,7 +104,7 @@ async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookie
     }
 
     let text = response.text().await?;
- 
+
     match serde_json::from_str::<LoginFailure>(&text) {
         // failure is a 200!
         Ok(failed) => Err(Error {
@@ -268,7 +268,7 @@ mod test {
         let result = do_get_csrf(rt).await.unwrap_err();
         assert_eq!(result.status, Some(201));
         assert_eq!(result.message, "");
-    } 
+    }
 
     #[tokio::test]
     async fn get_csrf_error() {
@@ -486,7 +486,7 @@ mod test {
 
         let result = aw!(post_login(&client, login_url, &login_params, &csrf.1)).unwrap();
 //        let result = aw!(post_login(&client, login_url, &login_params, "")).unwrap();
-        assert_eq!(result, "");        
+        assert_eq!(result, "");
     }
 */
 }
