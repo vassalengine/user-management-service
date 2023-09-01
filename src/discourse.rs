@@ -65,10 +65,10 @@ async fn get_csrf(client: &Client, url: &str) -> Result<(String, String), Error>
 }
 
 #[derive(Serialize)]
-struct LoginParams {
-    login: String,
-    password: String,
-    authenticity_token: String
+struct LoginParams<'a> {
+    login: &'a str,
+    password: &'a str,
+    authenticity_token: &'a str
 }
 
 #[derive(Deserialize, Serialize)]
@@ -76,7 +76,7 @@ struct LoginFailure {
     error: String
 }
 
-async fn post_login(client: &Client, url: &str, params: &LoginParams, cookies: &str) -> Result<String, Error> 
+async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookies: &str) -> Result<String, Error>
 {
     // This is slightly weird. Successful login returns a JSON blob. Failed
     // login returns JSON with an "error" key. We don't want to parse the
@@ -138,9 +138,9 @@ impl DiscourseAuth {
         let csrf = get_csrf(&self.client, &self.csrf_url).await?;
 
         let params = LoginParams {
-            login: username.into(),
-            password: password.into(),
-            authenticity_token: csrf.0
+            login: username,
+            password: password,
+            authenticity_token: &csrf.0
         };
 
         Ok(post_login(&self.client, &self.login_url, &params, &csrf.1).await?)
@@ -278,7 +278,7 @@ mod test {
         assert_eq!(result.status, Some(418));
     }
 
-    async fn do_post_login(rt: ResponseTemplate, params: &LoginParams, cookies: &str) ->  Result<String, Error> {
+    async fn do_post_login(rt: ResponseTemplate, params: &LoginParams<'_>, cookies: &str) ->  Result<String, Error> {
         let mock_server = setup_server("POST", LOGIN_ENDPOINT, rt).await;
         let client = Client::builder().build().unwrap();
         let url = mock_server.uri() + LOGIN_ENDPOINT;
@@ -288,9 +288,9 @@ mod test {
     #[tokio::test]
     async fn post_login_ok() {
         let params = LoginParams {
-            login: "skroob".into(),
-            password: "12345".into(),
-            authenticity_token: CSRF_TOKEN.into()
+            login: "skroob",
+            password: "12345",
+            authenticity_token: CSRF_TOKEN
         };
 
         let json = json!({ "user": "stuff" });
@@ -309,9 +309,9 @@ mod test {
         // but only pass on the JSON string returned by post_login().
 
         let params = LoginParams {
-            login: "skroob".into(),
-            password: "12345".into(),
-            authenticity_token: CSRF_TOKEN.into()
+            login: "skroob",
+            password: "12345",
+            authenticity_token: CSRF_TOKEN
         };
 
         let json = json!({ "user": "stuff" }).to_string();
@@ -330,9 +330,9 @@ mod test {
     #[tokio::test]
     async fn post_login_not_json() {
         let params = LoginParams {
-            login: "skroob".into(),
-            password: "12345".into(),
-            authenticity_token: CSRF_TOKEN.into()
+            login: "skroob",
+            password: "12345",
+            authenticity_token: CSRF_TOKEN
         };
 
         let rt = ResponseTemplate::new(200)
@@ -346,9 +346,9 @@ mod test {
     #[tokio::test]
     async fn post_login_failed() {
         let params = LoginParams {
-            login: "skroob".into(),
-            password: "12345".into(),
-            authenticity_token: CSRF_TOKEN.into()
+            login: "skroob",
+            password: "12345",
+            authenticity_token: CSRF_TOKEN
         };
 
         let err_msg = "Incorrect username, email or password";
@@ -368,9 +368,9 @@ mod test {
     #[tokio::test]
     async fn post_login_bad_auth_token() {
         let params = LoginParams {
-            login: "skroob".into(),
-            password: "12345".into(),
-            authenticity_token: "".into()
+            login: "skroob",
+            password: "12345",
+            authenticity_token: ""
         };
 
         let rt = ResponseTemplate::new(403);
@@ -383,9 +383,9 @@ mod test {
     #[tokio::test]
     async fn post_login_no_session_cookie() {
         let params = LoginParams {
-            login: "skroob".into(),
-            password: "12345".into(),
-            authenticity_token: CSRF_TOKEN.into()
+            login: "skroob",
+            password: "12345",
+            authenticity_token: CSRF_TOKEN
         };
 
         let rt = ResponseTemplate::new(403);
@@ -398,9 +398,9 @@ mod test {
     #[tokio::test]
     async fn post_login_error() {
         let params = LoginParams {
-            login: "skroob".into(),
-            password: "12345".into(),
-            authenticity_token: CSRF_TOKEN.into()
+            login: "skroob",
+            password: "12345",
+            authenticity_token: CSRF_TOKEN
         };
 
         let rt = ResponseTemplate::new(500);
@@ -478,10 +478,10 @@ mod test {
 
         let login_url = "https://forum.vassalengine.org/session.json";
         let login_params = LoginParams {
-//            login: "skroob".into(),
-//            password: "12345".into(),
-            authenticity_token: csrf.0
-//            authenticity_token: "".into()
+//            login: "skroob",
+//            password: "12345",
+            authenticity_token: &csrf.0
+//            authenticity_token: ""
         };
 
         let result = aw!(post_login(&client, login_url, &login_params, &csrf.1)).unwrap();
