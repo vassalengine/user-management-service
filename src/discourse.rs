@@ -72,8 +72,8 @@ struct LoginParams<'a> {
 }
 
 #[derive(Deserialize, Serialize)]
-struct LoginFailure {
-    error: String
+struct LoginFailure<'a> {
+    error: &'a str
 }
 
 async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookies: &str) -> Result<String, Error>
@@ -109,7 +109,7 @@ async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookie
         // failure is a 200!
         Ok(failed) => Err(Error {
             status: Some(status.as_u16()),
-            message: failed.error
+            message: failed.error.into()
         }),
         // we failed to parse as a failure, so we succeeded
         Err(_) => Ok(text)
