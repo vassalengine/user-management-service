@@ -59,6 +59,7 @@ fn rocket() -> _ {
 #[cfg(test)]
 mod test {
     use super::*;
+
     use rocket::http::ContentType;
     use rocket::local::blocking::Client;
 
