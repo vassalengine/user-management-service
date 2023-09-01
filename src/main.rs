@@ -34,17 +34,17 @@ struct Token {
     token: String
 }
 
-#[post("/login", rank = 1)]
-fn login_non_json() -> Result<(), Status> {
-    // reject non-JSON Content-Types
-    Err(Status::BadRequest)
-}
-
 #[post("/login", format = "json", data = "<payload>", rank = 0)]
 fn login(payload: Json<Login>) -> Result<Json<Token>, Status> {
     println!("{}", payload.username);
     println!("{}", payload.password);
     Err(Status::NotImplemented)
+}
+
+#[post("/login", rank = 1)]
+fn login_non_json() -> Result<(), Status> {
+    // reject non-JSON Content-Types
+    Err(Status::BadRequest)
 }
 
 const API_V1: Origin<'_> = uri!("/api/v1");

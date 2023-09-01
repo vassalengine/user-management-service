@@ -149,11 +149,11 @@ impl DiscourseAuth {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     use const_format::concatcp;
     use serde_json::json;
     use wiremock::{MockServer, Mock, ResponseTemplate, matchers};
-
-    use super::*;
 
     async fn setup_server(method: &str, endpoint: &str, rt: ResponseTemplate) -> MockServer {
         let mock_server = MockServer::start().await;
