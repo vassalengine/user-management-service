@@ -47,7 +47,7 @@ fn login_non_json() -> Result<(), Status> {
     Err(Status::BadRequest)
 }
 
-const API_V1: Origin<'_> = uri!("/api/v1");
+const API_V1: &str = "/api/v1";
 
 #[launch]
 fn rocket() -> _ {
