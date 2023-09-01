@@ -3,7 +3,7 @@
 pub mod discourse;
 
 use rocket::{
-    Request, catch, catchers, get, launch, post, routes, uri,
+    Request, catch, catchers, get, launch, post, routes,
     http::Status,
     serde::{
         Deserialize, Serialize,
@@ -62,8 +62,11 @@ fn rocket() -> _ {
 mod test {
     use super::*;
 
-    use rocket::http::ContentType;
-    use rocket::local::blocking::Client;
+    use rocket::{
+        uri,
+        http::ContentType,
+        local::blocking::Client
+    };
 
     #[derive(Debug, Deserialize, PartialEq)]
     #[serde(crate = "rocket::serde")]
