@@ -76,7 +76,7 @@ mod test {
         let client = Client::tracked(rocket()).unwrap();
         let base = uri!("/api/v1");
         let response = client.post(uri!(base, login))
-            .body("{ \"username\": \"bob\", \"password\": 12345 }")
+            .body(r#"{ "username": "bob", "password": 12345 }"#)
             .dispatch();
 
         assert_eq!(response.status(), Status::BadRequest);
@@ -131,7 +131,7 @@ mod test {
         let base = uri!("/api/v1");
         let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
-            .body("{ \"username\": \"bob\" }")
+            .body(r#"{ "username": "bob" }"#)
             .dispatch();
         assert_eq!(response.status(), Status::UnprocessableEntity);
         assert_eq!(response.content_type(), Some(ContentType::JSON));
@@ -149,7 +149,7 @@ mod test {
         let base = uri!("/api/v1");
         let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
-            .body("{ \"username\": 3, \"password\": \"12345\" }")
+            .body(r#"{ "username": 3, "password": "12345" }"#)
             .dispatch();
         assert_eq!(response.status(), Status::UnprocessableEntity);
         assert_eq!(response.content_type(), Some(ContentType::JSON));
@@ -167,7 +167,7 @@ mod test {
         let base = uri!("/api/v1");
         let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
-            .body("{ \"password\": \"12345\" }")
+            .body(r#"{ "password": "12345" }"#)
             .dispatch();
         assert_eq!(response.status(), Status::UnprocessableEntity);
         assert_eq!(response.content_type(), Some(ContentType::JSON));
@@ -185,7 +185,7 @@ mod test {
         let base = uri!("/api/v1");
         let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
-            .body("{ \"username\": \"skroob\", \"password\": 12345 }")
+            .body(r#"{ "username": "skroob", "password": 12345 }"#)
             .dispatch();
         assert_eq!(response.status(), Status::UnprocessableEntity);
         assert_eq!(response.content_type(), Some(ContentType::JSON));
@@ -203,7 +203,7 @@ mod test {
         let base = uri!("/api/v1");
         let response = client.post(uri!(base, login))
             .header(ContentType::JSON)
-            .body("{ \"username\": \"skroob\", \"password\": \"12345\" }")
+            .body(r#"{ "username": "skroob", "password": "12345" }"#)
             .dispatch();
         assert_eq!(response.status(), Status::NotImplemented);
         assert_eq!(response.content_type(), Some(ContentType::JSON));
