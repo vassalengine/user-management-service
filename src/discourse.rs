@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::From;
 
 #[derive(Debug)]
-struct Error {
+pub struct Error {
     status: Option<u16>,
     message: String
 }
@@ -116,7 +116,7 @@ async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookie
     }
 }
 
-struct DiscourseAuth {
+pub struct DiscourseAuth {
     client: Client,
     csrf_url: String,
     login_url: String
@@ -126,7 +126,7 @@ const CSRF_ENDPOINT: &str = "/session/csrf.json";
 const LOGIN_ENDPOINT: &str = "/session.json";
 
 impl DiscourseAuth {
-    fn new(url: &str) -> DiscourseAuth {
+    pub fn new(url: &str) -> DiscourseAuth {
         DiscourseAuth {
             client: Client::builder().build().unwrap(),
             csrf_url: url.to_string() + CSRF_ENDPOINT,
@@ -134,7 +134,7 @@ impl DiscourseAuth {
         }
     }
 
-    async fn login(&self, username: &str, password: &str) -> Result<String, Error> {
+    pub async fn login(&self, username: &str, password: &str) -> Result<String, Error> {
         let csrf = get_csrf(&self.client, &self.csrf_url).await?;
 
         let params = LoginParams {
