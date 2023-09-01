@@ -25,9 +25,9 @@ fn get_projects() -> &'static str {
 
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
-struct Login {
-    username: String,
-    password: String
+struct Login<'a> {
+    username: &'a str,
+    password: &'a str
 }
 
 #[derive(Serialize)]
@@ -37,7 +37,7 @@ struct Token {
 }
 
 #[post("/login", format = "json", data = "<payload>", rank = 0)]
-fn login(payload: Json<Login>) -> Result<Json<Token>, Status> {
+async fn login(payload: Json<Login<'_>>) -> Result<Json<Token>, Status> {
     println!("{}", payload.username);
     println!("{}", payload.password);
     Err(Status::NotImplemented)
