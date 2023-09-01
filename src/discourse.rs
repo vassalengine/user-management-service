@@ -424,7 +424,11 @@ mod test {
                 }
             );
 
-        let login_rt = ResponseTemplate::new(200);
+        let json = json!({ "user": "stuff" });
+        let json_str = json.to_string();
+
+        let login_rt = ResponseTemplate::new(200)
+            .set_body_json(json);
 
         let mock_server = MockServer::start().await;
 
@@ -444,9 +448,8 @@ mod test {
 
         let dauth = DiscourseAuth::new(&mock_server.uri());
 
-// TODO
-        let result = dauth.login("skroob", "12345").await.unwrap_err();
-        assert_eq!(result.status, Some(200));
+        let result = dauth.login("skroob", "12345").await.unwrap();
+        assert_eq!(result, json_str);
     }
 
 /*
