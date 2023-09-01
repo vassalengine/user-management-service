@@ -17,5 +17,4 @@ serde_json = "*"
 [dev-dependencies]
 const_format = "*"
 tokio = "*"
-tokio-test = "*"
 wiremock = "*"
