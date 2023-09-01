@@ -139,11 +139,11 @@ impl DiscourseAuth {
 
         let params = LoginParams {
             login: username,
-            password: password,
+            password,
             authenticity_token: &csrf.0
         };
 
-        Ok(post_login(&self.client, &self.login_url, &params, &csrf.1).await?)
+        post_login(&self.client, &self.login_url, &params, &csrf.1).await
     }
 }
 
