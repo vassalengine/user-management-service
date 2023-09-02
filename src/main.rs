@@ -86,7 +86,7 @@ mod test {
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         assert_eq!(
             response.into_json::<ErrorMessage>(),
-            Some(ErrorMessage{
+            Some(ErrorMessage {
                 error: Status::BadRequest.reason().unwrap().to_string()
             })
         );
@@ -104,7 +104,7 @@ mod test {
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         assert_eq!(
             response.into_json::<ErrorMessage>(),
-            Some(ErrorMessage{
+            Some(ErrorMessage {
                 error: Status::BadRequest.reason().unwrap().to_string()
             })
         );
@@ -122,7 +122,7 @@ mod test {
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         assert_eq!(
             response.into_json::<ErrorMessage>(),
-            Some(ErrorMessage{
+            Some(ErrorMessage {
                 error: Status::BadRequest.reason().unwrap().to_string()
             })
         );
@@ -140,7 +140,7 @@ mod test {
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         assert_eq!(
             response.into_json::<ErrorMessage>(),
-            Some(ErrorMessage{
+            Some(ErrorMessage {
                 error: Status::UnprocessableEntity.reason().unwrap().to_string()
             })
         );
@@ -158,7 +158,7 @@ mod test {
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         assert_eq!(
             response.into_json::<ErrorMessage>(),
-            Some(ErrorMessage{
+            Some(ErrorMessage {
                 error: Status::UnprocessableEntity.reason().unwrap().to_string()
             })
         );
@@ -176,7 +176,7 @@ mod test {
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         assert_eq!(
             response.into_json::<ErrorMessage>(),
-            Some(ErrorMessage{
+            Some(ErrorMessage {
                 error: Status::UnprocessableEntity.reason().unwrap().to_string()
             })
         );
@@ -194,7 +194,7 @@ mod test {
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         assert_eq!(
             response.into_json::<ErrorMessage>(),
-            Some(ErrorMessage{
+            Some(ErrorMessage {
                 error: Status::UnprocessableEntity.reason().unwrap().to_string()
             })
         );
@@ -212,7 +212,7 @@ mod test {
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         assert_eq!(
             response.into_json::<ErrorMessage>(),
-            Some(ErrorMessage{
+            Some(ErrorMessage {
                 error: Status::NotImplemented.reason().unwrap().to_string()
             })
         );
