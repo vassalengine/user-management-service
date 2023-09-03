@@ -1,3 +1,5 @@
+use crate::auth_provider::{AuthProvider, Error, Failure};
+
 use reqwest::{
     Client, StatusCode,
     header::{ACCEPT, COOKIE, CONTENT_TYPE, HeaderValue}
@@ -5,27 +7,21 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use std::convert::From;
 
-#[derive(Debug)]
-pub struct Error {
-    status: Option<u16>,
-    message: String
-}
-
-impl From<reqwest::Error> for Error {
+impl From<reqwest::Error> for Failure {
     fn from(e: reqwest::Error) -> Self {
-        Error {
+        Failure::Error(Error {
             status: e.status().map(|s| s.as_u16()),
             message: e.to_string()
-        }
+        })
     }
 }
 
-impl Error {
+impl Failure {
     async fn from(r: reqwest::Response) -> Self {
-        Error {
+        Failure::Error(Error {
             status: Some(r.status().as_u16()),
             message: r.text().await.unwrap_or_else(|e| e.to_string())
-        }
+        })
     }
 }
 
@@ -36,7 +32,7 @@ struct CsrfResult {
     csrf: String
 }
 
-async fn get_csrf(client: &Client, url: &str) -> Result<(String, String), Error> {
+async fn get_csrf(client: &Client, url: &str) -> Result<(String, String), Failure> {
     // do the GET
     let response = client.get(url)
         .header(ACCEPT, MIME_JSON)
@@ -46,7 +42,7 @@ async fn get_csrf(client: &Client, url: &str) -> Result<(String, String), Error>
 
     // non-200 results are errors
     if response.status() != StatusCode::OK {
-        return Err(Error::from(response).await);
+        return Err(Failure::from(response).await);
     }
 
     // collect the returned cookies
@@ -76,7 +72,7 @@ struct LoginFailure<'a> {
     error: &'a str
 }
 
-async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookies: &str) -> Result<String, Error>
+async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookies: &str) -> Result<String, Failure>
 {
     // This is slightly weird. Successful login returns a JSON blob. Failed
     // login returns JSON with an "error" key. We don't want to parse the
@@ -95,22 +91,19 @@ async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookie
 
     // non-200 results are errors
     if status != StatusCode::OK {
-        return Err(Error::from(response).await);
+        return Err(Failure::from(response).await);
     }
 
     // non-JSON results are errors
     if response.headers().get(CONTENT_TYPE) != Some(&HeaderValue::from_static(MIME_JSON)) {
-        return Err(Error::from(response).await);
+        return Err(Failure::from(response).await);
     }
 
     let text = response.text().await?;
 
     match serde_json::from_str::<LoginFailure>(&text) {
         // failure is a 200!
-        Ok(failed) => Err(Error {
-            status: Some(status.as_u16()),
-            message: failed.error.into()
-        }),
+        Ok(_) => Err(Failure::Unauthorized),
         // we failed to parse as a failure, so we succeeded
         Err(_) => Ok(text)
     }
@@ -133,8 +126,10 @@ impl DiscourseAuth {
             login_url: url.to_string() + LOGIN_ENDPOINT,
         }
     }
+}
 
-    pub async fn login(&self, username: &str, password: &str) -> Result<String, Error> {
+impl AuthProvider for DiscourseAuth {
+    async fn login(&self, username: &str, password: &str) -> Result<String, Failure> {
         let csrf = get_csrf(&self.client, &self.csrf_url).await?;
 
         let params = LoginParams {
@@ -168,7 +163,7 @@ mod test {
         mock_server
     }
 
-    async fn do_get_csrf(rt: ResponseTemplate) ->  Result<(String, String), Error> {
+    async fn do_get_csrf(rt: ResponseTemplate) ->  Result<(String, String), Failure> {
         let mock_server = setup_server("GET", CSRF_ENDPOINT, rt).await;
         let client = Client::builder().build().unwrap();
         let url = mock_server.uri() + CSRF_ENDPOINT;
@@ -215,8 +210,10 @@ mod test {
             );
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert_eq!(result.status, None);
-        assert!(!result.message.is_empty());
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, None);
+        assert!(!err.message.is_empty());
     }
 
     #[tokio::test]
@@ -227,8 +224,10 @@ mod test {
             );
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert_eq!(result.status, None);
-        assert!(!result.message.is_empty());
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, None);
+        assert!(!err.message.is_empty());
     }
 
     #[tokio::test]
@@ -258,8 +257,10 @@ mod test {
             .set_body_string("this is not JSON");
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert_eq!(result.status, None);
-        assert!(!result.message.is_empty());
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, None);
+        assert!(!err.message.is_empty());
     }
 
     #[tokio::test]
@@ -267,8 +268,10 @@ mod test {
         let rt = ResponseTemplate::new(201);
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert_eq!(result.status, Some(201));
-        assert_eq!(result.message, "");
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, Some(201));
+        assert_eq!(err.message, "");
     }
 
     #[tokio::test]
@@ -276,10 +279,12 @@ mod test {
         let rt = ResponseTemplate::new(418);
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert_eq!(result.status, Some(418));
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, Some(418));
     }
 
-    async fn do_post_login(rt: ResponseTemplate, params: &LoginParams<'_>, cookies: &str) ->  Result<String, Error> {
+    async fn do_post_login(rt: ResponseTemplate, params: &LoginParams<'_>, cookies: &str) ->  Result<String, Failure> {
         let mock_server = setup_server("POST", LOGIN_ENDPOINT, rt).await;
         let client = Client::builder().build().unwrap();
         let url = mock_server.uri() + LOGIN_ENDPOINT;
@@ -340,8 +345,10 @@ mod test {
             .set_body_string("this is not JSON");
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
-        assert_eq!(result.status, Some(200));
-        assert!(!result.message.is_empty());
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, Some(200));
+        assert!(!err.message.is_empty());
     }
 
     #[tokio::test]
@@ -362,8 +369,7 @@ mod test {
             );
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
-        assert_eq!(result.status, Some(200));
-        assert_eq!(result.message, err_msg);
+        assert!(matches!(result, Failure::Unauthorized));
     }
 
     #[tokio::test]
@@ -377,8 +383,10 @@ mod test {
         let rt = ResponseTemplate::new(403);
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
-        assert_eq!(result.status, Some(403));
-        assert!(!result.message.is_empty());
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, Some(403));
+        assert!(!err.message.is_empty());
     }
 
     #[tokio::test]
@@ -392,8 +400,10 @@ mod test {
         let rt = ResponseTemplate::new(403);
 
         let result = do_post_login(rt, &params, "").await.unwrap_err();
-        assert_eq!(result.status, Some(403));
-        assert!(!result.message.is_empty());
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, Some(403));
+        assert!(!err.message.is_empty());
     }
 
     #[tokio::test]
@@ -407,8 +417,10 @@ mod test {
         let rt = ResponseTemplate::new(500);
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
-        assert_eq!(result.status, Some(500));
-        assert!(!result.message.is_empty());
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, Some(500));
+        assert!(!err.message.is_empty());
     }
 
     #[tokio::test]
@@ -450,6 +462,49 @@ mod test {
 
         let result = dauth.login("skroob", "12345").await.unwrap();
         assert_eq!(result, json_str);
+    }
+
+    #[tokio::test]
+    async fn discourse_auth_failed() {
+        let csrf_rt = ResponseTemplate::new(200)
+            .insert_header(
+                "Set-Cookie",
+                CSRF_SET_COOKIE
+            )
+            .set_body_json(
+                CsrfResult {
+                    csrf: CSRF_TOKEN.into()
+                }
+            );
+
+        let err_msg = "Incorrect username, email or password";
+        let login_rt = ResponseTemplate::new(200)
+            .set_body_json(
+                LoginFailure {
+                    error: err_msg.into()
+                }
+            );
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path(CSRF_ENDPOINT))
+            .respond_with(csrf_rt)
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(matchers::method("POST"))
+            .and(matchers::path(LOGIN_ENDPOINT))
+            .respond_with(login_rt)
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let dauth = DiscourseAuth::new(&mock_server.uri());
+
+        let result = dauth.login("skroob", "12345").await.unwrap_err();
+        assert!(matches!(result, Failure::Unauthorized));
     }
 
 /*
