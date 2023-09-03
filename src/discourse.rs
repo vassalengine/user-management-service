@@ -16,12 +16,12 @@ impl From<reqwest::Error> for Failure {
     }
 }
 
-impl Failure {
+impl Error {
     async fn from(r: reqwest::Response) -> Self {
-        Failure::Error(Error {
+        Error {
             status: Some(r.status().as_u16()),
             message: r.text().await.unwrap_or_else(|e| e.to_string())
-        })
+        }
     }
 }
 
@@ -42,7 +42,7 @@ async fn get_csrf(client: &Client, url: &str) -> Result<(String, String), Failur
 
     // non-200 results are errors
     if response.status() != StatusCode::OK {
-        return Err(Failure::from(response).await);
+        return Err(Failure::Error(Error::from(response).await));
     }
 
     // collect the returned cookies
@@ -91,12 +91,12 @@ async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookie
 
     // non-200 results are errors
     if status != StatusCode::OK {
-        return Err(Failure::from(response).await);
+        return Err(Failure::Error(Error::from(response).await));
     }
 
     // non-JSON results are errors
     if response.headers().get(CONTENT_TYPE) != Some(&HeaderValue::from_static(MIME_JSON)) {
-        return Err(Failure::from(response).await);
+        return Err(Failure::Error(Error::from(response).await));
     }
 
     let text = response.text().await?;
