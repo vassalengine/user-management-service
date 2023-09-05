@@ -1,74 +1,7 @@
-/*
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
-use jwt::{
-    AlgorithmType, Header, SignWithKey, Token, VerifyWithKey,
-    claims::{Claims, RegisteredClaims},
-    header::PrecomputedAlgorithmOnlyHeader
-};
-use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
+use crate::jwt_provider::{Error, Issuer, Verifier};
 
-#[derive(Debug)]
-pub struct Error {
-    pub message: String
-}
-
-impl<E: ToString> From<E> for Error {
-    fn from(e: E) -> Self {
-        Error { message: e.to_string() }    
-    }
-}
-
-pub fn expiry(seconds: u64) -> Result<u64, SystemTimeError> {
-    Ok(
-        (
-            SystemTime::now().duration_since(UNIX_EPOCH)? +
-            Duration::from_secs(seconds)
-        ).as_secs()
-    )
-}
-
-pub fn issue(key: &[u8], username: &str, expiry: u64) -> Result<String, Error> {
-
-    let key: Hmac<Sha256> = Hmac::new_from_slice(key)?;
-
-    let header = PrecomputedAlgorithmOnlyHeader(AlgorithmType::Hs256);
-
-    let claims = RegisteredClaims {
-        subject: Some(username.into()),
-        expiration: Some(expiry),
-        ..Default::default()
-    };
-
-    Ok(Token::new(header, claims).sign_with_key(&key)?.into())
-}
-
-pub fn verify(key: &[u8], token_str: &str) -> Result<String, Error> {
-
-    let key: Hmac<Sha256> = Hmac::new_from_slice(key)?;
-    let token: Token<Header, Claims, _> = Token::parse_unverified(token_str)?;
-    let token = token.verify_with_key(&key)?;
-//    let token: Token<Header, Claims, _> = token_str.verify_with_key(&key)?;
-
-    println!("{:?}", token.header());
-    println!("{:?}", token.claims());
-
-    Ok(
-        token.claims().registered.subject
-            .clone()
-            .ok_or("Missing sub claim")?
-            .to_owned()
-    )
-}
-*/
-
-use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
+use jsonwebtoken::{encode, decode, get_current_timestamp, Header, Validation, EncodingKey, DecodingKey};
 use serde::{Serialize, Deserialize};
-
-#[derive(Debug)]
-pub struct Error {
-    pub message: String
-}
 
 impl<E: ToString> From<E> for Error {
     fn from(e: E) -> Self {
@@ -82,23 +15,38 @@ struct Claims {
     exp: u64
 }
 
-pub fn issue(key: &[u8], username: &str, expiry: u64) -> Result<String, Error> {
+fn issue(key: &EncodingKey, username: &str, expiry: u64) -> Result<String, Error> {
     let claims = Claims {
         sub: username.into(),
         exp: expiry
     };
 
-    let key = EncodingKey::from_secret(key);
-
     Ok(encode(&Header::default(), &claims, &key)?)
 }
 
-pub fn verify(key: &[u8], token_str: &str) -> Result<String, Error> {
-    let key = DecodingKey::from_secret(key);
-
+fn verify(key: &DecodingKey, token_str: &str) -> Result<String, Error> {
     let token = decode::<Claims>(token_str, &key, &Validation::default())?;
-    println!("{:?}", token);
     Ok(token.claims.sub)
+}
+
+pub struct JWTIssuer {
+    key: EncodingKey
+}
+
+impl Issuer for JWTIssuer {
+    fn issue(&self, username: &str, duration: u64) -> Result<String, Error> {
+        issue(&self.key, username, get_current_timestamp() + duration)
+    }
+}
+
+pub struct JWTVerifier {
+    key: DecodingKey
+}
+
+impl Verifier for JWTVerifier {
+    fn verify(&self, token: &str) -> Result<String, Error> {
+        verify(&self.key, token)
+    }
 }
 
 #[cfg(test)]
@@ -109,26 +57,56 @@ mod test {
 
     #[test]
     fn issue_ok() {
-//        assert_eq!(issue(KEY, "skroob").unwrap(), "");
-        assert_eq!(issue(KEY, "skroob", 1693870400).unwrap(), "");
+        let key = EncodingKey::from_secret(KEY);
+        let tok = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJza3Jvb2IiLCJleHAiOjE2OTM4NzA0MDB9.V_54o3AwhkPcIdP-2Pea3MJ2vS82hF8EA0wFseCv3ho";
+        assert_eq!(issue(&key, "skroob", 1693870400).unwrap(), tok);
     }
 
     #[test]
     fn verify_ok() {
+        // It's not possible to mock out std::SystemTime::now(), which
+        // is used by jsonwebtoken to check expriation timestamps. The
+        // encoded token has its expiration timestamp set to 899999999999,
+        // which is in the year 30489. If you are still using this in the
+        // year 30489, please accept my appologies for the failing test.
 
-        assert_eq!(verify(KEY, "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJza3Jvb2IiLCJleHAiOjE2OTM4NzA0MDB9.JImeUPCkOiA6h-dh-Ef-iXCJW65UAx-pcdABOnBfO0U").unwrap(), "skroob");
-
+        /*
+            {"typ": "JWT","alg": "HS256"}
+            {"sub": "skroob", "exp": 899999999999}
+        */
+        let key = DecodingKey::from_secret(KEY);
+        let tok = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJza3Jvb2IiLCJleHAiOjg5OTk5OTk5OTk5OX0.9fL6Jbac5rsqs5G0h-0xkLaC2_m2lk0sZkfO3-1UnCQ";
+        assert_eq!(verify(&key, tok).unwrap(), "skroob");
     }
 
     #[test]
     fn verify_malformed() {
+        let key = DecodingKey::from_secret(KEY);
+        let tok = "bogus";
+        assert!(verify(&key, tok).is_err());
     }
 
     #[test]
     fn verify_no_subject() {
+        /*
+            {"typ": "JWT","alg": "HS256"}
+            {"exp": 1693870400}
+        */
+        let key = DecodingKey::from_secret(KEY);
+        let tok = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2OTM4NzA0MDB9.4OsPnUn4ea-v4f85Eb3WtBb7qQWXEWQjjxdn058IQhc";
+        assert!(verify(&key, tok).is_err());
     }
 
     #[test]
     fn verify_expired() {
+        // This test will fail if you run it before 1970. Don't do that.
+
+        /*
+            {"typ": "JWT","alg": "HS256"}
+            {"exp": 0}
+        */
+        let key = DecodingKey::from_secret(KEY);
+        let tok = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjB9.RluhbuoRzQ_dryWPSrvOuO7K9TW-dUy4aENfybjoeCI";
+        assert!(verify(&key, tok).is_err());
     }
 }
