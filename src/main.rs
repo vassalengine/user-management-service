@@ -28,7 +28,7 @@ async fn root() -> &'static str {
     "hello world"
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Login {
     username: String,
     password: String
