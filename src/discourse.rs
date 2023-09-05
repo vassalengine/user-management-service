@@ -5,7 +5,6 @@ use reqwest::{
     header::{ACCEPT, COOKIE, CONTENT_TYPE, HeaderValue}
 };
 use serde::{Deserialize, Serialize};
-use std::convert::From;
 
 impl From<reqwest::Error> for Failure {
     fn from(e: reqwest::Error) -> Self {
