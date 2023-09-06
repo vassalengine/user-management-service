@@ -12,6 +12,7 @@ edition = "2021"
 axum = { version = "*", features = ["http1", "json", "tokio"] }
 const_format = "*"
 jsonwebtoken = "*"
+mime = "*"
 reqwest = { version = "*", features = ["cookies", "json"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
@@ -19,6 +20,5 @@ tokio = { version = "*", features = ["full"] }
 
 [dev-dependencies]
 hyper = { version = "*", features = ["full"] }
-mime = "*"
 tower = { version = "*", fatures = ["util"] }
 wiremock = "*"

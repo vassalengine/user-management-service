@@ -1,10 +1,12 @@
 use crate::auth_provider::{AuthProvider, Error, Failure};
 
+use mime::APPLICATION_JSON;
 use reqwest::{
     Client, StatusCode,
-    header::{ACCEPT, COOKIE, CONTENT_TYPE, HeaderValue}
+    header::{ACCEPT, COOKIE}
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 impl From<reqwest::Error> for Failure {
     fn from(e: reqwest::Error) -> Self {
@@ -24,8 +26,6 @@ impl Error {
     }
 }
 
-const MIME_JSON: &str = "application/json";
-
 #[derive(Deserialize, Serialize)]
 struct CsrfResult {
     csrf: String
@@ -34,7 +34,7 @@ struct CsrfResult {
 async fn get_csrf(client: &Client, url: &str) -> Result<(String, String), Failure> {
     // do the GET
     let response = client.get(url)
-        .header(ACCEPT, MIME_JSON)
+        .header(ACCEPT, APPLICATION_JSON.as_ref())
         .send()
         .await?
         .error_for_status()?;
@@ -67,20 +67,22 @@ struct LoginParams<'a> {
 }
 
 #[derive(Deserialize, Serialize)]
-struct LoginFailure<'a> {
-    error: &'a str
+struct LoginFailure {
+    error: String
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum LoginResult {
+    Failure(LoginFailure),
+    Success(Value)
 }
 
 async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookies: &str) -> Result<String, Failure>
 {
-    // This is slightly weird. Successful login returns a JSON blob. Failed
-    // login returns JSON with an "error" key. We don't want to parse the
-    // success JSON here, so we only try parsing the error JSON and pass on
-    // the success JSON as text.
-
     let response = client.post(url)
         .json(params)
-        .header(ACCEPT, MIME_JSON)
+        .header(ACCEPT, APPLICATION_JSON.as_ref())
         .header(COOKIE, cookies)
         .send()
         .await?
@@ -93,18 +95,11 @@ async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookie
         return Err(Failure::Error(Error::from(response).await));
     }
 
-    // non-JSON results are errors
-    if response.headers().get(CONTENT_TYPE) != Some(&HeaderValue::from_static(MIME_JSON)) {
-        return Err(Failure::Error(Error::from(response).await));
-    }
-
-    let text = response.text().await?;
-
-    match serde_json::from_str::<LoginFailure>(&text) {
-        // failure is a 200!
-        Ok(_) => Err(Failure::Unauthorized),
-        // we failed to parse as a failure, so we succeeded
-        Err(_) => Ok(text)
+    // This is slightly weird. Successful login returns a JSON blob. Failed
+    // login returns JSON with an "error" key.
+    match response.json::<LoginResult>().await? {
+        LoginResult::Failure(r) => Err(Failure::Unauthorized),
+        LoginResult::Success(r) => Ok(r.to_string())
     }
 }
 
@@ -205,7 +200,7 @@ mod test {
             .set_body_raw(
                 // purposely truncate the JSON
                 &json[..&json.len() - 1],
-                MIME_JSON
+                APPLICATION_JSON.as_ref()
             );
 
         let result = do_get_csrf(rt).await.unwrap_err();
@@ -325,11 +320,14 @@ mod test {
             .set_body_raw(
                 // purposely truncate the JSON
                 &json[..&json.len() - 1],
-                MIME_JSON
+                APPLICATION_JSON.as_ref()
             );
 
-        let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap();
-        assert_eq!(result, &json[..&json.len() - 1]);
+        let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, None);
+        assert!(!err.message.is_empty());
     }
 
     #[tokio::test]
@@ -346,7 +344,7 @@ mod test {
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
         assert!(matches!(result, Failure::Error(_)));
         let Failure::Error(err) = result else { unreachable!() };
-        assert_eq!(err.status, Some(200));
+        assert_eq!(err.status, None);
         assert!(!err.message.is_empty());
     }
 
@@ -504,6 +502,17 @@ mod test {
 
         let result = dauth.login("skroob", "12345").await.unwrap_err();
         assert!(matches!(result, Failure::Unauthorized));
+    }
+
+    #[tokio::test]
+    async fn discourse_auth_failed_to_connect() {
+        let dauth = DiscourseAuth::new("http://bogus");
+
+        let result = dauth.login("skroob", "12345").await.unwrap_err();
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, None);
+        assert!(!err.message.is_empty());
     }
 
 /*
