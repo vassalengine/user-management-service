@@ -75,17 +75,28 @@ impl From<auth_provider::Failure> for AppError {
     }
 }
 
+impl From<jwt_provider::Error> for AppError {
+    fn from(e: jwt_provider::Error) -> Self {
+        AppError::ServerError(HttpError {
+            status: 500,
+            message: e.message
+        })
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             AppError::Unauthorized => {
-                (StatusCode::UNAUTHORIZED, "Unauthorized")
+                (StatusCode::UNAUTHORIZED, "Unauthorized".to_string())
             },
-            AppError::InternalError => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
-            },
-            AppError::HttpError => {
-                (StatusCode::BAD_REQUEST, "Bad Request")
+            AppError::ServerError(e)
+            | AppError::ClientError(e) => {
+                match StatusCode::from_u16(e.status) {
+                    Ok(s) => (s, e.message),
+                    // should not happen
+                    Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, e.message)
+                }
             }
         };
 
