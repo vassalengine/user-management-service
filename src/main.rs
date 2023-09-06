@@ -8,6 +8,8 @@ mod jwt_provider;
 
 use auth_provider::AuthProvider;
 use discourse::DiscourseAuth;
+use jwt::JWTIssuer;
+use jwt_provider::Issuer;
 
 use axum::{
     Router, Server,
@@ -24,6 +26,8 @@ const BASE_URL: &str = "https://forum.vassalengine.org/";
 
 const API_V1: &str = "/api/v1";
 
+const KEY: &[u8] = b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z";
+
 async fn root() -> &'static str {
     "hello world"
 }
@@ -39,19 +43,30 @@ struct Token {
     token: String
 }
 
-// TODO: return errors as JSON
+struct HttpError {
+    status: u16,
+    message: String
+}
 
 enum AppError {
     Unauthorized,
-    InternalError,
-    HttpError
+    ServerError(HttpError),
+    ClientError(HttpError)
 }
 
 impl From<auth_provider::Failure> for AppError {
     fn from(e: auth_provider::Failure) -> Self {
         match e {
             auth_provider::Failure::Error(err) => {
-                AppError::InternalError
+                // All auth provider errors are 500 for us; put the auth
+                // provider status into the message if there is one.
+                AppError::ServerError(HttpError {
+                    status: 500,
+                    message: match err.status {
+                        Some(s) => format!("{} {}", s, err.message),
+                        None => err.message
+                    }
+                })
             },
             auth_provider::Failure::Unauthorized => {
                 AppError::Unauthorized
@@ -82,11 +97,10 @@ impl IntoResponse for AppError {
     }
 }
 
-
-
-async fn login_handler<A: AuthProvider>(payload: Json<Login>, auth: A) -> Result<Json<Token>, AppError> {
-    let r = auth.login(&payload.username, &payload.password).await?;
-    Ok(Json(Token { token: "token".into() }))
+async fn login_handler<A: AuthProvider, I: Issuer>(payload: Json<Login>, auth: A, issuer: I) -> Result<Json<Token>, AppError> {
+    let _r = auth.login(&payload.username, &payload.password).await?;
+    let token = issuer.issue(&payload.username, 8 * 60 * 60)?;
+    Ok(Json(Token { token: token }))
 }
 
 fn app() -> Router {
@@ -94,7 +108,7 @@ fn app() -> Router {
         .route(formatcp!("{API_V1}/"), get(root))
         .route(
             formatcp!("{API_V1}/login"),
-            post(move |body| login_handler(body, DiscourseAuth::new(BASE_URL)))
+            post(move |body| login_handler(body, DiscourseAuth::new(BASE_URL), JWTIssuer::new(KEY)))
         )
 }
 
@@ -122,6 +136,14 @@ mod test {
     };
     use mime::{APPLICATION_JSON, TEXT_PLAIN};
     use tower::ServiceExt; // for oneshot
+
+    struct FakeIssuer;
+
+    impl Issuer for FakeIssuer {
+        fn issue(&self, username: &str, duration: u64) -> Result<String, jwt_provider::Error> {
+            Ok("woohoo".into())
+        }
+    }
 
     struct NoAuth;
 
@@ -153,7 +175,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, NoAuth {}))
+                post(move |body| login_handler(body, NoAuth {}, FakeIssuer {}))
             )
     }
 
@@ -170,7 +192,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, OkAuth {}))
+                post(move |body| login_handler(body, OkAuth {}, FakeIssuer {}))
             )
     }
 
@@ -187,7 +209,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, FailAuth {}))
+                post(move |body| login_handler(body, FailAuth {}, FakeIssuer {}))
             )
     }
 
@@ -207,7 +229,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, ErrorAuth {}))
+                post(move |body| login_handler(body, ErrorAuth {}, FakeIssuer {}))
             )
     }
 
@@ -260,7 +282,7 @@ mod test {
 
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let body: Token = serde_json::from_slice(&body).unwrap();
-        assert_eq!(body, Token { token: "token".into() });
+        assert_eq!(body, Token { token: "woohoo".into() });
     }
 
     #[tokio::test]
