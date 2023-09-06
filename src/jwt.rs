@@ -21,11 +21,11 @@ fn issue(key: &EncodingKey, username: &str, expiry: u64) -> Result<String, Error
         exp: expiry
     };
 
-    Ok(encode(&Header::default(), &claims, &key)?)
+    Ok(encode(&Header::default(), &claims, key)?)
 }
 
 fn verify(key: &DecodingKey, token_str: &str) -> Result<String, Error> {
-    let token = decode::<Claims>(token_str, &key, &Validation::default())?;
+    let token = decode::<Claims>(token_str, key, &Validation::default())?;
     Ok(token.claims.sub)
 }
 
