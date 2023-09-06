@@ -186,7 +186,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, NoAuth {}, FakeIssuer {}))
+                post(move |body| login_handler(body, NoAuth, FakeIssuer))
             )
     }
 
@@ -203,7 +203,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, OkAuth {}, FakeIssuer {}))
+                post(move |body| login_handler(body, OkAuth, FakeIssuer))
             )
     }
 
@@ -220,7 +220,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, FailAuth {}, FakeIssuer {}))
+                post(move |body| login_handler(body, FailAuth, FakeIssuer))
             )
     }
 
@@ -240,7 +240,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, ErrorAuth {}, FakeIssuer {}))
+                post(move |body| login_handler(body, ErrorAuth, FakeIssuer))
             )
     }
 
