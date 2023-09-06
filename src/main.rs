@@ -108,9 +108,9 @@ struct LoginParams {
     password: String
 }
 
-async fn login_handler<A: AuthProvider, I: Issuer>(payload: Json<LoginParams>, auth: A, issuer: I) -> Result<Json<Token>, AppError> {
-    let _r = auth.login(&payload.username, &payload.password).await?;
-    let token = issuer.issue(&payload.username, 8 * 60 * 60)?;
+async fn login_handler<A: AuthProvider, I: Issuer>(params: Json<LoginParams>, auth: A, issuer: I) -> Result<Json<Token>, AppError> {
+    let _r = auth.login(&params.username, &params.password).await?;
+    let token = issuer.issue(&params.username, 8 * 60 * 60)?;
     Ok(Json(Token { token }))
 }
 
