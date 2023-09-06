@@ -111,7 +111,7 @@ impl IntoResponse for AppError {
 async fn login_handler<A: AuthProvider, I: Issuer>(payload: Json<Login>, auth: A, issuer: I) -> Result<Json<Token>, AppError> {
     let _r = auth.login(&payload.username, &payload.password).await?;
     let token = issuer.issue(&payload.username, 8 * 60 * 60)?;
-    Ok(Json(Token { token: token }))
+    Ok(Json(Token { token }))
 }
 
 fn app() -> Router {
