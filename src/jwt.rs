@@ -33,6 +33,14 @@ pub struct JWTIssuer {
     key: EncodingKey
 }
 
+impl JWTIssuer {
+    pub fn new(key: &[u8]) -> Self {
+        JWTIssuer {
+            key: EncodingKey::from_secret(key)
+        }
+    }
+}
+
 impl Issuer for JWTIssuer {
     fn issue(&self, username: &str, duration: u64) -> Result<String, Error> {
         issue(&self.key, username, get_current_timestamp() + duration)
@@ -41,6 +49,14 @@ impl Issuer for JWTIssuer {
 
 pub struct JWTVerifier {
     key: DecodingKey
+}
+
+impl JWTVerifier {
+    pub fn new(key: &[u8]) -> Self {
+        JWTVerifier {
+            key: DecodingKey::from_secret(key)
+        }
+    }
 }
 
 impl Verifier for JWTVerifier {
