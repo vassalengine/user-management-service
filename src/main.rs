@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-const BASE_URL: &str = "https://forum.vassalengine.org/";
+const BASE_URL: &str = "https://forum.vassalengine.org";
 
 const API_V1: &str = "/api/v1";
 
