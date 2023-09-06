@@ -51,12 +51,7 @@ async fn get_csrf(client: &Client, url: &str) -> Result<(String, String), Failur
         .join("; ");
 
     // return the token and the cookies
-    Ok(
-        (
-            response.json::<CsrfResult>().await?.csrf,
-            cookies
-        )
-    )
+    Ok((response.json::<CsrfResult>().await?.csrf, cookies))
 }
 
 #[derive(Serialize)]
