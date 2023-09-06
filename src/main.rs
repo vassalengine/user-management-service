@@ -15,7 +15,7 @@ use axum::{
     Router, Server,
     http::StatusCode,
     response::{IntoResponse, Json, Response},
-    routing::{ get, post }
+    routing::{get, post}
 };
 use const_format::formatcp;
 use serde::{Deserialize, Serialize};
