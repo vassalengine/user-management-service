@@ -20,7 +20,7 @@ use axum::{
 use const_format::formatcp;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 
 const BASE_URL: &str = "https://forum.vassalengine.org";
 
@@ -125,7 +125,7 @@ fn app() -> Router {
 
 #[tokio::main]
 async fn main() {
-    let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 3000);
+    let socket = SocketAddr::from(([0, 0, 0, 0], 3000));
     Server::bind(&socket)
         .serve(app().into_make_service())
         .await
