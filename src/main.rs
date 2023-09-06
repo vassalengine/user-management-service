@@ -103,12 +103,12 @@ impl IntoResponse for AppError {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Login {
+struct Credentials {
     username: String,
     password: String
 }
 
-async fn login_handler<A: AuthProvider, I: Issuer>(payload: Json<Login>, auth: A, issuer: I) -> Result<Json<Token>, AppError> {
+async fn login_handler<A: AuthProvider, I: Issuer>(payload: Json<Credentials>, auth: A, issuer: I) -> Result<Json<Token>, AppError> {
     let _r = auth.login(&payload.username, &payload.password).await?;
     let token = issuer.issue(&payload.username, 8 * 60 * 60)?;
     Ok(Json(Token { token }))
@@ -277,7 +277,7 @@ mod test {
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                     .body(Body::from(
                         serde_json::to_vec(
-                            &Login {
+                            &Credentials {
                                 username: "skroob".into(),
                                 password: "12345".into()
                             }
@@ -325,7 +325,7 @@ mod test {
                     .uri(formatcp!("{API_V1}/login"))
                     .body(Body::from(
                         serde_json::to_vec(
-                            &Login {
+                            &Credentials {
                                 username: "skroob".into(),
                                 password: "12345".into()
                             }
@@ -466,7 +466,7 @@ mod test {
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                     .body(Body::from(
                         serde_json::to_vec(
-                            &Login {
+                            &Credentials {
                                 username: "skroob".into(),
                                 password: "12345".into()
                             }
@@ -493,7 +493,7 @@ mod test {
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                     .body(Body::from(
                         serde_json::to_vec(
-                            &Login {
+                            &Credentials {
                                 username: "skroob".into(),
                                 password: "12345".into()
                             }
