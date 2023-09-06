@@ -125,8 +125,8 @@ fn app() -> Router {
 
 #[tokio::main]
 async fn main() {
-    let socket = SocketAddr::from(([0, 0, 0, 0], 3000));
-    Server::bind(&socket)
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    Server::bind(&addr)
         .serve(app().into_make_service())
         .await
         .unwrap();
