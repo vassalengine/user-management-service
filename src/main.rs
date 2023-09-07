@@ -32,11 +32,6 @@ async fn root() -> &'static str {
     "hello world"
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
-struct Token {
-    token: String
-}
-
 struct HttpError {
     status: u16,
     message: String
@@ -106,6 +101,11 @@ impl IntoResponse for AppError {
 struct LoginParams {
     username: String,
     password: String
+}
+
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
+struct Token {
+    token: String
 }
 
 async fn login_handler<A: AuthProvider, I: Issuer>(params: Json<LoginParams>, auth: A, issuer: I) -> Result<Json<Token>, AppError> {
