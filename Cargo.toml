@@ -1,8 +1,8 @@
 [package]
-name = "gls"
+name = "ums"
 version = "0.1.0"
 authors = ["Joel Uckelman <uckelman@nomic.net>"]
-description = "Vassal Game Library Service"
+description = "Vassal User Management Service"
 license = "GPL-3.0-or-later"
 edition = "2021"
 
