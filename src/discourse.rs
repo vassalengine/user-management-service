@@ -93,7 +93,7 @@ async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookie
     // This is slightly weird. Successful login returns a JSON blob. Failed
     // login returns JSON with an "error" key.
     match response.json::<LoginResult>().await? {
-        LoginResult::Failure(r) => Err(Failure::Unauthorized),
+        LoginResult::Failure(_) => Err(Failure::Unauthorized),
         LoginResult::Success(r) => Ok(r.to_string())
     }
 }
