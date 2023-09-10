@@ -1,5 +1,4 @@
 #![feature(async_fn_in_trait)]
-#![feature(decl_macro)]
 
 mod auth_provider;
 mod discourse;
