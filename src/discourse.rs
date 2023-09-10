@@ -98,6 +98,7 @@ async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookie
     }
 }
 
+#[derive(Clone)]
 pub struct DiscourseAuth {
     client: Client,
     csrf_url: String,
