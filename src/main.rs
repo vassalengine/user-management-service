@@ -21,12 +21,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::net::SocketAddr;
 
-const BASE_URL: &str = "https://forum.vassalengine.org";
-
-const API_V1: &str = "/api/v1";
-
-const KEY: &[u8] = b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z";
-
 async fn root() -> &'static str {
     "hello world"
 }
@@ -113,20 +107,41 @@ async fn login_handler<A: AuthProvider, I: Issuer>(params: Json<LoginParams>, au
     Ok(Json(Token { token }))
 }
 
-fn app() -> Router {
+#[derive(Debug)]
+struct Config {
+    discourse_url: String,
+    jwt_key: Vec<u8>,
+    api_base_path: String,
+    listen_ip: [u8; 4],
+    listen_port: u16 
+}
+
+fn app(config: &Config) -> Router {
+    let auth = DiscourseAuth::new(&config.discourse_url);
+    let issuer = JWTIssuer::new(&config.jwt_key);
+    let login_handler_actual = move |body| login_handler(body, auth, issuer);
+
     Router::new()
-        .route(formatcp!("{API_V1}/"), get(root))
+        .route(&format!("{}/", config.api_base_path), get(root))
         .route(
-            formatcp!("{API_V1}/login"),
-            post(move |body| login_handler(body, DiscourseAuth::new(BASE_URL), JWTIssuer::new(KEY)))
+            &format!("{}/login", config.api_base_path),
+            post(login_handler_actual)
         )
 }
 
 #[tokio::main]
 async fn main() {
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let config = Config {
+        discourse_url: "https://forum.vassalengine.org".into(),
+        jwt_key: b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z".to_vec(),
+        api_base_path: "/api/v1".into(),
+        listen_ip: [0, 0, 0, 0],
+        listen_port: 3000
+    };
+
+    let addr = SocketAddr::from((config.listen_ip, config.listen_port));
     Server::bind(&addr)
-        .serve(app().into_make_service())
+        .serve(app(&config).into_make_service())
         .await
         .unwrap();
 }
@@ -147,6 +162,8 @@ mod test {
     use mime::{APPLICATION_JSON, TEXT_PLAIN};
     use tower::ServiceExt; // for oneshot
 
+    const API_V1: &str = "/api/v1";
+ 
     struct FakeIssuer;
 
     impl Issuer for FakeIssuer {
@@ -185,7 +202,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, NoAuth, FakeIssuer))
+                post(|body| login_handler(body, NoAuth, FakeIssuer))
             )
     }
 
@@ -202,7 +219,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, OkAuth, FakeIssuer))
+                post(|body| login_handler(body, OkAuth, FakeIssuer))
             )
     }
 
@@ -219,7 +236,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, FailAuth, FakeIssuer))
+                post(|body| login_handler(body, FailAuth, FakeIssuer))
             )
     }
 
@@ -239,7 +256,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(root))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(move |body| login_handler(body, ErrorAuth, FakeIssuer))
+                post(|body| login_handler(body, ErrorAuth, FakeIssuer))
             )
     }
 
