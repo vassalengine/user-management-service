@@ -117,16 +117,29 @@ struct Config {
     listen_port: u16 
 }
 
-fn app(config: &Config) -> Router {
+fn routes(config: &Config) -> Router {
     let auth = DiscourseAuth::new(&config.discourse_url);
     let issuer = JWTIssuer::new(&config.jwt_key);
     let login_handler_actual = move |body| login_handler(body, auth, issuer);
 
+    let api = &config.api_base_path;
+
     Router::new()
-        .route(&format!("{}/", config.api_base_path), get(handlers::root_get))
         .route(
-            &format!("{}/login", config.api_base_path),
+            &format!("{api}/"),
+            get(handlers::root_get)
+        )
+        .route(
+            &format!("{api}/login"),
             post(login_handler_actual)
+        )
+        .route(
+            &format!("{api}/user/:user/avatar"),
+            get(user_avatar_get)
+        )
+        .layer(
+            ServiceBuilder::new()
+                .layer(CorsLayer::very_permissive())
         )
 }
 
@@ -140,9 +153,22 @@ async fn main() {
         listen_port: 3000
     };
 
+    let app = routes(&config).layer(
+        ServiceBuilder::new().layer(
+            HandleErrorLayer::new(|err: BoxError| async move {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Unhandled error: {}", err)
+                )
+            })
+        )
+        .buffer(1024)
+        .rate_limit(5, Duration::from_secs(1))
+    );
+
     let addr = SocketAddr::from((config.listen_ip, config.listen_port));
-    Server::bind(&addr)
-        .serve(app(&config).into_make_service())
+    let listener = TcpListener::bind(addr).await.unwrap();
+    serve(listener, app)
         .await
         .unwrap();
 }
