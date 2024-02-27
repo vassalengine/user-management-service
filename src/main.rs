@@ -1,15 +1,5 @@
 #![feature(async_fn_in_trait)]
 
-mod auth_provider;
-mod discourse;
-mod jwt;
-mod jwt_provider;
-
-use auth_provider::AuthProvider;
-use discourse::DiscourseAuth;
-use jwt::JWTIssuer;
-use jwt_provider::Issuer;
-
 use axum::{
     Router, Server,
     http::StatusCode,
@@ -20,6 +10,20 @@ use const_format::formatcp;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::net::SocketAddr;
+
+mod avatar;
+mod auth_provider;
+mod discourse;
+mod jwt;
+mod jwt_provider;
+
+use crate::{
+    avatar::get_avatar,
+    auth_provider::AuthProvider,
+    discourse::DiscourseAuth,
+    jwt::JWTIssuer,
+    jwt_provider::Issuer
+};
 
 async fn root() -> &'static str {
     "hello world"
