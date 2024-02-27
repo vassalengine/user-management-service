@@ -96,7 +96,7 @@ struct Config {
 fn routes(config: &Config) -> Router {
     let auth = DiscourseAuth::new(&config.discourse_url);
     let issuer = JWTIssuer::new(&config.jwt_key);
-    let login_post_actual = move |body| handlers::login_post(body, auth, issuer);
+    let login_post = move |body| handlers::login_post(body, auth, issuer);
 
     let api = &config.api_base_path;
 
@@ -107,7 +107,7 @@ fn routes(config: &Config) -> Router {
         )
         .route(
             &format!("{api}/login"),
-            post(login_post_actual)
+            post(login_post)
         )
         .route(
             &format!("{api}/user/:user/avatar"),
