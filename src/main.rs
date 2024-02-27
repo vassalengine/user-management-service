@@ -14,6 +14,7 @@ use std::net::SocketAddr;
 mod avatar;
 mod auth_provider;
 mod discourse;
+mod handlers;
 mod jwt;
 mod jwt_provider;
 
@@ -24,10 +25,6 @@ use crate::{
     jwt::JWTIssuer,
     jwt_provider::Issuer
 };
-
-async fn root() -> &'static str {
-    "hello world"
-}
 
 struct HttpError {
     status: u16,
@@ -126,7 +123,7 @@ fn app(config: &Config) -> Router {
     let login_handler_actual = move |body| login_handler(body, auth, issuer);
 
     Router::new()
-        .route(&format!("{}/", config.api_base_path), get(root))
+        .route(&format!("{}/", config.api_base_path), get(handlers::root_get))
         .route(
             &format!("{}/login", config.api_base_path),
             post(login_handler_actual)
@@ -211,7 +208,7 @@ mod test {
 
     fn test_app_no_auth() -> Router {
         Router::new()
-            .route(formatcp!("{API_V1}/"), get(root))
+            .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
                 post(|body| login_handler(body, NoAuth, FakeIssuer))
@@ -233,7 +230,7 @@ mod test {
 
     fn test_app_ok_auth() -> Router {
         Router::new()
-            .route(formatcp!("{API_V1}/"), get(root))
+            .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
                 post(|body| login_handler(body, OkAuth, FakeIssuer))
@@ -255,7 +252,7 @@ mod test {
 
     fn test_app_fail_auth() -> Router {
         Router::new()
-            .route(formatcp!("{API_V1}/"), get(root))
+            .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
                 post(|body| login_handler(body, FailAuth, FakeIssuer))
@@ -280,7 +277,7 @@ mod test {
 
     fn test_app_error_auth() -> Router {
         Router::new()
-            .route(formatcp!("{API_V1}/"), get(root))
+            .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
                 post(|body| login_handler(body, ErrorAuth, FakeIssuer))
