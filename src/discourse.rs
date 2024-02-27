@@ -278,7 +278,7 @@ mod test {
         let mock_server = setup_server("POST", LOGIN_ENDPOINT, rt).await;
         let client = Client::builder().build().unwrap();
         let url = mock_server.uri() + LOGIN_ENDPOINT;
-        post_login(&client, &url, &params, &cookies).await
+        post_login(&client, &url, params, cookies).await
     }
 
     #[tokio::test]

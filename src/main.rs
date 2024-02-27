@@ -1,13 +1,10 @@
 use axum::{
     BoxError, Router, serve,
     error_handling::HandleErrorLayer,
-    extract::Path,
     http::StatusCode,
     response::{IntoResponse, Json, Response},
     routing::{get, post}
 };
-use const_format::formatcp;
-use serde::Deserialize;
 use serde_json::json;
 use std::{net::SocketAddr, time::Duration};
 use tokio::net::TcpListener;
@@ -28,13 +25,9 @@ mod jwt_provider;
 mod model;
 
 use crate::{
-    avatar::get_avatar,
-    auth_provider::AuthProvider,
     discourse::DiscourseAuth,
     errors::{AppError, HttpError},
-    jwt::JWTIssuer,
-    jwt_provider::Issuer,
-    model::{LoginParams, Token}
+    jwt::JWTIssuer
 };
 
 impl From<auth_provider::Failure> for AppError {
@@ -162,8 +155,6 @@ async fn main() {
 mod test {
     use super::*;
 
-    use auth_provider::Failure;
-
     use axum::{
         body::{self, Body, Bytes},
         http::{
@@ -171,8 +162,16 @@ mod test {
             header::CONTENT_TYPE,
         },
     };
+    use const_format::formatcp;
     use mime::{APPLICATION_JSON, TEXT_PLAIN};
+    use serde::Deserialize;
     use tower::ServiceExt; // for oneshot
+
+    use crate::{
+        auth_provider::{AuthProvider, Failure},
+        jwt_provider::Issuer,
+        model::{LoginParams, Token}
+    };
 
     const API_V1: &str = "/api/v1";
 
