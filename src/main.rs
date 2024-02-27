@@ -153,7 +153,7 @@ mod test {
     use auth_provider::Failure;
 
     use axum::{
-        body::Body,
+        body::{self, Body, Bytes},
         http::{
             Method, Request,
             header::CONTENT_TYPE,
@@ -163,11 +163,28 @@ mod test {
     use tower::ServiceExt; // for oneshot
 
     const API_V1: &str = "/api/v1";
- 
+
+    async fn body_bytes(r: Response) -> Bytes {
+        body::to_bytes(r.into_body(), usize::MAX).await.unwrap()
+    }
+
+    async fn body_as<D: for<'a> Deserialize<'a>>(r: Response) -> D {
+        serde_json::from_slice::<D>(&body_bytes(r).await).unwrap()
+    }
+
+    async fn body_empty(r: Response) -> bool {
+        body_bytes(r).await.is_empty()
+    }
+
     struct FakeIssuer;
 
     impl Issuer for FakeIssuer {
-        fn issue(&self, _username: &str, _duration: u64) -> Result<String, jwt_provider::Error> {
+        fn issue(
+            &self,
+            _username: &str,
+            _duration: u64
+        ) -> Result<String, jwt_provider::Error>
+        {
             Ok("woohoo".into())
         }
     }
@@ -175,27 +192,18 @@ mod test {
     struct NoAuth;
 
     impl AuthProvider for NoAuth {
-        async fn login(&self, _username: &str, _password: &str) -> Result<String, Failure> {
+        async fn login(
+            &self,
+            _username: &str,
+            _password: &str
+        ) -> Result<String, Failure>
+        {
             Err(Failure::Error(auth_provider::Error {
                 status: Some(500),
                 message: "Should never be called".into()
             }))
         }
     }
-
-/*
-    fn test_app<A: AuthProvider + Default>() -> Router {
-        Router::new()
-            .route(formatcp!("{API_V1}/"), get(root))
-            .route(
-                formatcp!("{API_V1}/login"),
-                post({
-                    let auth = A::default();
-                    move |body| login_handler(body, auth)
-                })
-            )
-    }
-*/
 
     fn test_app_no_auth() -> Router {
         Router::new()
@@ -209,7 +217,12 @@ mod test {
     struct OkAuth;
 
     impl AuthProvider for OkAuth {
-        async fn login(&self, _username: &str, _password: &str) -> Result<String, Failure> {
+        async fn login(
+            &self,
+            _username: &str,
+            _password: &str
+        ) -> Result<String, Failure>
+        {
             Ok("auth ok".into())
         }
     }
@@ -226,7 +239,12 @@ mod test {
     struct FailAuth;
 
     impl AuthProvider for FailAuth {
-        async fn login(&self, _username: &str, _password: &str) -> Result<String, Failure> {
+        async fn login(
+            &self,
+            _username: &str,
+            _password: &str
+        ) -> Result<String, Failure>
+        {
             Err(Failure::Unauthorized)
         }
     }
@@ -243,7 +261,12 @@ mod test {
     struct ErrorAuth;
 
     impl AuthProvider for ErrorAuth {
-        async fn login(&self, _username: &str, _password: &str) -> Result<String, Failure> {
+        async fn login(
+            &self,
+            _username: &str,
+            _password: &str
+        ) -> Result<String, Failure>
+        {
             Err(Failure::Error(auth_provider::Error {
                 status: Some(500),
                 message: "Auth provider had an error".into()
@@ -276,9 +299,7 @@ mod test {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        assert_eq!(&body[..], b"hello world");
+        assert_eq!(&body_bytes(response).await[..], b"hello world");
     }
 
     #[tokio::test]
@@ -306,10 +327,10 @@ mod test {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        let body: Token = serde_json::from_slice(&body).unwrap();
-        assert_eq!(body, Token { token: "woohoo".into() });
+        assert_eq!(
+            body_as::<Token>(response).await,
+            Token { token: "woohoo".into() }
+        );
     }
 
     #[tokio::test]
@@ -523,5 +544,4 @@ mod test {
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
-
 }
