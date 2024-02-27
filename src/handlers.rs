@@ -14,7 +14,7 @@ pub async fn root_get() -> &'static str {
     "hello world"
 }
 
-pub async fn login_handler<A, I>(
+pub async fn login_post<A, I>(
     Json(params): Json<LoginParams>,
     auth: A,
     issuer: I

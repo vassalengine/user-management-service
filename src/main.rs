@@ -105,7 +105,7 @@ struct Config {
 fn routes(config: &Config) -> Router {
     let auth = DiscourseAuth::new(&config.discourse_url);
     let issuer = JWTIssuer::new(&config.jwt_key);
-    let login_handler_actual = move |body| handlers::login_handler(body, auth, issuer);
+    let login_post_actual = move |body| handlers::login_post(body, auth, issuer);
 
     let api = &config.api_base_path;
 
@@ -116,7 +116,7 @@ fn routes(config: &Config) -> Router {
         )
         .route(
             &format!("{api}/login"),
-            post(login_handler_actual)
+            post(login_post_actual)
         )
         .route(
             &format!("{api}/user/:user/avatar"),
@@ -222,7 +222,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(|body| handlers::login_handler(body, NoAuth, FakeIssuer))
+                post(|body| handlers::login_post(body, NoAuth, FakeIssuer))
             )
     }
 
@@ -244,7 +244,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(|body| handlers::login_handler(body, OkAuth, FakeIssuer))
+                post(|body| handlers::login_post(body, OkAuth, FakeIssuer))
             )
     }
 
@@ -266,7 +266,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(|body| handlers::login_handler(body, FailAuth, FakeIssuer))
+                post(|body| handlers::login_post(body, FailAuth, FakeIssuer))
             )
     }
 
@@ -291,7 +291,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(|body| handlers::login_handler(body, ErrorAuth, FakeIssuer))
+                post(|body| handlers::login_post(body, ErrorAuth, FakeIssuer))
             )
     }
 
