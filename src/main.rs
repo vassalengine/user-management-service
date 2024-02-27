@@ -150,7 +150,7 @@ async fn main() {
         jwt_key: b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z".to_vec(),
         api_base_path: "/api/v1".into(),
         listen_ip: [0, 0, 0, 0],
-        listen_port: 3000
+        listen_port: 4000
     };
 
     let app = routes(&config).layer(
