@@ -1,7 +1,7 @@
-#![feature(async_fn_in_trait)]
-
 use axum::{
-    Router, Server,
+    BoxError, Router, serve,
+    error_handling::HandleErrorLayer,
+    extract::Path,
     http::StatusCode,
     response::{IntoResponse, Json, Response},
     routing::{get, post}
@@ -9,7 +9,14 @@ use axum::{
 use const_format::formatcp;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
+use tokio::net::TcpListener;
+use tower::{
+    ServiceBuilder,
+    buffer::BufferLayer,
+    limit::RateLimitLayer
+};
+use tower_http::cors::CorsLayer;
 
 mod avatar;
 mod auth_provider;
