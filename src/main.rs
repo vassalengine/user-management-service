@@ -114,7 +114,7 @@ struct Config {
     jwt_key: Vec<u8>,
     api_base_path: String,
     listen_ip: [u8; 4],
-    listen_port: u16 
+    listen_port: u16
 }
 
 fn routes(config: &Config) -> Router {
