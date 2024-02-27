@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post}
 };
 use const_format::formatcp;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use std::{net::SocketAddr, time::Duration};
 use tokio::net::TcpListener;
@@ -21,28 +21,21 @@ use tower_http::cors::CorsLayer;
 mod avatar;
 mod auth_provider;
 mod discourse;
+mod errors;
 mod handlers;
 mod jwt;
 mod jwt_provider;
+mod model;
 
 use crate::{
     avatar::get_avatar,
     auth_provider::AuthProvider,
     discourse::DiscourseAuth,
+    errors::{AppError, HttpError},
     jwt::JWTIssuer,
-    jwt_provider::Issuer
+    jwt_provider::Issuer,
+    model::{LoginParams, Token}
 };
-
-struct HttpError {
-    status: u16,
-    message: String
-}
-
-enum AppError {
-    Unauthorized,
-    ServerError(HttpError),
-    ClientError(HttpError)
-}
 
 impl From<auth_provider::Failure> for AppError {
     fn from(e: auth_provider::Failure) -> Self {
@@ -98,21 +91,6 @@ impl IntoResponse for AppError {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct LoginParams {
-    username: String,
-    password: String
-}
-
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
-struct Token {
-    token: String
-}
-
-async fn login_handler<A: AuthProvider, I: Issuer>(params: Json<LoginParams>, auth: A, issuer: I) -> Result<Json<Token>, AppError> {
-    let _r = auth.login(&params.username, &params.password).await?;
-    let token = issuer.issue(&params.username, 8 * 60 * 60)?;
-    Ok(Json(Token { token }))
 }
 
 #[derive(Debug)]
@@ -127,7 +105,7 @@ struct Config {
 fn routes(config: &Config) -> Router {
     let auth = DiscourseAuth::new(&config.discourse_url);
     let issuer = JWTIssuer::new(&config.jwt_key);
-    let login_handler_actual = move |body| login_handler(body, auth, issuer);
+    let login_handler_actual = move |body| handlers::login_handler(body, auth, issuer);
 
     let api = &config.api_base_path;
 
@@ -244,7 +222,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(|body| login_handler(body, NoAuth, FakeIssuer))
+                post(|body| handlers::login_handler(body, NoAuth, FakeIssuer))
             )
     }
 
@@ -266,7 +244,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(|body| login_handler(body, OkAuth, FakeIssuer))
+                post(|body| handlers::login_handler(body, OkAuth, FakeIssuer))
             )
     }
 
@@ -288,7 +266,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(|body| login_handler(body, FailAuth, FakeIssuer))
+                post(|body| handlers::login_handler(body, FailAuth, FakeIssuer))
             )
     }
 
@@ -313,7 +291,7 @@ mod test {
             .route(formatcp!("{API_V1}/"), get(handlers::root_get))
             .route(
                 formatcp!("{API_V1}/login"),
-                post(|body| login_handler(body, ErrorAuth, FakeIssuer))
+                post(|body| handlers::login_handler(body, ErrorAuth, FakeIssuer))
             )
     }
 
