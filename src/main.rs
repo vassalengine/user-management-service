@@ -84,8 +84,6 @@ impl IntoResponse for AppError {
     }
 }
 
-}
-
 #[derive(Debug)]
 struct Config {
     discourse_url: String,
@@ -113,7 +111,7 @@ fn routes(config: &Config) -> Router {
         )
         .route(
             &format!("{api}/user/:user/avatar"),
-            get(user_avatar_get)
+            get(handlers::user_avatar_get)
         )
         .layer(
             ServiceBuilder::new()
