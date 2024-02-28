@@ -31,13 +31,24 @@ where
     Ok(Json(Token { token }))
 }
 
+// discourse connect provider secrets *
+// TODO: make these configurable
+const SHARED_SECRET: &[u8] = b"DSQh*Q`HQF$!hz2SuSl@";
+const DISCOURSE_URL: &str = "https://forum.vassalengine.org";
+
 fn start_sso_request(
     params: &SsoLoginParams,
     jar: CookieJar,
     login: bool
 ) -> Result<(CookieJar, Redirect), AppError>
 {
-    let (nonce, url) = make_sso_request(&params.returnto, login);
+    let (nonce, url) = make_sso_request(
+        SHARED_SECRET,
+        DISCOURSE_URL,
+        &params.returnto,
+        login
+    );
+
     Ok(
         (
             jar.add(Cookie::new("nonce", nonce)),
@@ -71,9 +82,10 @@ pub async fn sso_complete_login_get(
         .to_owned();
 
     let (username, name) = verify_sso_response(
+            SHARED_SECRET,
+            &nonce_expected,
             &params.sso,
-            &params.sig,
-            &nonce_expected
+            &params.sig
         )
         .or(Err(AppError::InternalError))?;
 
