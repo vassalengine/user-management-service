@@ -71,10 +71,11 @@ pub async fn sso_complete_login_get(
         .to_owned();
 
     let (username, name) = verify_sso_response(
-        &params.sso,
-        &params.sig,
-        &nonce_expected
-    )?;
+            &params.sso,
+            &params.sig,
+            &nonce_expected
+        )
+        .or(Err(AppError::InternalError))?;
 
     let jar = if let Some(name) = name {
         jar.add(Cookie::new("name", name))
