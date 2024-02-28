@@ -73,7 +73,6 @@ pub async fn sso_complete_login_get(
     let (username, name) = verify_sso_response(
         &params.sso,
         &params.sig,
-        &params.returnto,
         &nonce_expected
     )?;
 

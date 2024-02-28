@@ -1,13 +1,6 @@
-use axum::{
-    extract::Query,
-    http::Uri
-};
 use base64::{Engine as _};
 use hmac::{Hmac, Mac};
-use rand::{
-    self,
-    distributions::{Alphanumeric, DistString}
-};
+use rand::distributions::{Alphanumeric, DistString};
 use sha2::Sha256;
 use std::collections::HashMap;
 
@@ -60,12 +53,11 @@ pub fn make_sso_request(
 pub fn verify_sso_response(
     sso: &str,
     sig: &str,
-    returnto: &str,
     nonce_expected: &str
 ) -> Result<(String, Option<String>), AppError>
 {
     let mut mac = Hmac::<Sha256>::new_from_slice(SHARED_SECRET)
-        .or(Err(AppError::InternalError))?;
+        .expect("HMAC can take key of any size");
 
     mac.update(sso.as_bytes());
 
@@ -79,19 +71,10 @@ pub fn verify_sso_response(
         .decode(sso)
         .or(Err(AppError::InternalError))?;
 
-    let q = String::from_utf8(b)
-        .or(Err(AppError::InternalError))?;
-
-    let args = format!("/?{}", q);
-
-    let uri: Uri = args.parse()
-        .or(Err(AppError::InternalError))?;
-
-    let Query(qargs): Query<HashMap<String, String>> = Query::try_from_uri(&uri)
+    let qargs = serde_urlencoded::from_bytes::<HashMap<String, String>>(&b)
         .or(Err(AppError::InternalError))?;
 
 //    println!("{}", serde_json::to_string_pretty(&json!(qargs)).unwrap());
-//    println!("{}", returnto);
 
     let nonce_actual = qargs.get("nonce")
         .ok_or(AppError::InternalError)?
