@@ -83,14 +83,10 @@ pub fn verify_sso_response(
     // unpack the query
     let qargs = serde_urlencoded::from_bytes::<HashMap<String, String>>(&b)?;
 
-    let nonce_actual = qargs.get("nonce")
-        .ok_or(SsoResponseError::NonceMismatch)?
-        .to_string();
-
     // check that the nonce matches the one we sent
-    if nonce_actual != nonce_expected {
-        return Err(SsoResponseError::NonceMismatch);
-    }
+    qargs.get("nonce")
+        .filter(|nonce_actual| *nonce_actual == nonce_expected)
+        .ok_or(SsoResponseError::NonceMismatch)?;
 
     // fish out the username and name
     let username = qargs.get("username")
