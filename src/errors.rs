@@ -5,6 +5,7 @@ pub struct HttpError {
 
 pub enum AppError {
     Unauthorized,
+    InternalError,
     ServerError(HttpError),
     ClientError(HttpError)
 }

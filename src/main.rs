@@ -23,6 +23,7 @@ mod handlers;
 mod jwt;
 mod jwt_provider;
 mod model;
+mod sso;
 
 use crate::{
     discourse::DiscourseAuth,
@@ -64,7 +65,10 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             AppError::Unauthorized => {
-                (StatusCode::UNAUTHORIZED, "Unauthorized".to_string())
+                (StatusCode::UNAUTHORIZED, "Unauthorized".into())
+            },
+            AppError::InternalError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "TODO!".into())
             },
             AppError::ServerError(e)
             | AppError::ClientError(e) => {
@@ -108,6 +112,22 @@ fn routes(config: &Config) -> Router {
         .route(
             &format!("{api}/login"),
             post(login_post)
+        )
+        .route(
+            &format!("{api}/sso/completeLogin"),
+            get(handlers::sso_complete_login_get)
+        )
+        .route(
+            &format!("{api}/sso/completeLogout"),
+            get(handlers::sso_complete_logout_get)
+        )
+        .route(
+            &format!("{api}/sso/login"),
+            get(handlers::sso_login_get)
+        )
+        .route(
+            &format!("{api}/sso/logout"),
+            get(handlers::sso_logout_get)
         )
         .route(
             &format!("{api}/user/:user/avatar"),
