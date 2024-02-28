@@ -78,8 +78,7 @@ pub fn verify_sso_response(
     mac.verify_slice(&code_bytes)?;
 
     // base64 decode the query
-    let b = base64::engine::general_purpose::STANDARD
-        .decode(sso)?;
+    let b = base64::engine::general_purpose::STANDARD.decode(sso)?;
 
     // unpack the query
     let qargs = serde_urlencoded::from_bytes::<HashMap<String, String>>(&b)?;
