@@ -6,7 +6,7 @@ use axum_extra::extract::cookie::{Cookie, CookieJar};
 
 use crate::{
     auth_provider::AuthProvider,
-    avatar::get_avatar,
+    avatar::get_avatar_template,
     errors::AppError,
     jwt_provider::Issuer,
     model::{LoginParams, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, Token},
@@ -116,11 +116,14 @@ pub async fn sso_complete_logout_get(
     )
 }
 
-pub async fn user_avatar_get(
-    Path(username): Path<String>
-) -> Result<Json<String>, AppError>
+pub async fn users_user_avatar_get(
+    Path((username, size)): Path<(String, u32)>
+) -> Result<Redirect, AppError>
 {
-// FIXME: don't hard-code URL
-    let url = format!("https://forum.vassalengine.org/u/{}.json", username);
-    Ok(Json(get_avatar(&url).await?))
+    let avatar_template = get_avatar_template(DISCOURSE_URL, &username).await?;
+    let avatar_url = format!(
+        "{DISCOURSE_URL}{}",
+        avatar_template.replace("{size}", &size.to_string())
+    );
+    Ok(Redirect::to(&avatar_url))
 }

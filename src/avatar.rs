@@ -18,7 +18,13 @@ struct Reply {
 }
 
 //pub async fn get_avatar(client: &Client, url: &str) -> Result<String, Failure> {
-pub async fn get_avatar(url: &str) -> Result<String, Failure> {
+pub async fn get_avatar_template(
+    discourse_url: &str,
+    username: &str
+) -> Result<String, Failure> {
+    let url = format!("{discourse_url}/u/{username}.json");
+
+    // TODO: pass in client?
     let client = Client::builder().build().unwrap();
 
     // do the GET
@@ -38,5 +44,5 @@ pub async fn get_avatar(url: &str) -> Result<String, Failure> {
         ));
     }
 
-   Ok(response.json::<Reply>().await?.user.avatar_template)
+    Ok(response.json::<Reply>().await?.user.avatar_template)
 }

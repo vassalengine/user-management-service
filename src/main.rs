@@ -130,8 +130,8 @@ fn routes(config: &Config) -> Router {
             get(handlers::sso_logout_get)
         )
         .route(
-            &format!("{api}/user/:user/avatar"),
-            get(handlers::user_avatar_get)
+            &format!("{api}/users/:user/avatar/:size"),
+            get(handlers::users_user_avatar_get)
         )
         .layer(
             ServiceBuilder::new()
