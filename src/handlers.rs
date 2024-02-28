@@ -90,13 +90,13 @@ pub async fn sso_complete_login_get(
         .or(Err(AppError::InternalError))?;
 
     let jar = if let Some(name) = name {
-        jar.add(Cookie::new("name", name))
+        jar.add(Cookie::build(("name", name)).path("/"))
     }
     else {
         jar
     }
     .remove(Cookie::from("nonce"))
-    .add(Cookie::new("username", username));
+    .add(Cookie::build(("username", username)).path("/"));
 
     Ok((jar, Redirect::to(&params.returnto)))
 }
@@ -109,8 +109,8 @@ pub async fn sso_complete_logout_get(
     Ok(
         (
             jar.remove(Cookie::from("nonce"))
-                .remove(Cookie::from("username"))
-                .remove(Cookie::from("name")),
+                .remove(Cookie::build(("username", "")).path("/"))
+                .remove(Cookie::build(("name", "")).path("/")),
             Redirect::to(&params.returnto)
         )
     )
