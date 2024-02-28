@@ -37,7 +37,7 @@ fn start_sso_request(
     login: bool
 ) -> Result<(CookieJar, Redirect), AppError>
 {
-    let (nonce, url) = make_sso_request(&params.returnto, login)?;
+    let (nonce, url) = make_sso_request(&params.returnto, login);
     Ok(
         (
             jar.add(Cookie::new("nonce", nonce)),

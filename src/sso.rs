@@ -20,7 +20,7 @@ const DISCOURSE_URL: &str = "https://forum.vassalengine.org";
 pub fn make_sso_request(
     returnto: &str,
     login: bool
-) -> Result<(String, String), AppError>
+) -> (String, String)
 {
     // generate a nonce
     let mut rng = rand::thread_rng();
@@ -39,7 +39,7 @@ pub fn make_sso_request(
     let enc_payload = urlencoding::encode(&b64_payload);
 
     let mut mac = Hmac::<Sha256>::new_from_slice(SHARED_SECRET)
-        .or(Err(AppError::InternalError))?;
+        .expect("HMAC can take key of any size");
     mac.update(b64_payload.as_bytes());
 
     let result = mac.finalize();
@@ -54,7 +54,7 @@ pub fn make_sso_request(
         hex_signature
     );
 
-    Ok((nonce, url))
+    (nonce, url)
 }
 
 pub fn verify_sso_response(
