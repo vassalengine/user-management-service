@@ -16,7 +16,7 @@ pub fn make_sso_request(
     let mut rng = rand::thread_rng();
     let nonce = Alphanumeric.sample_string(&mut rng, 20);
 
-    // create a payload with the nonce and a return URL
+    // create a payload with the nonce and the return URL
     let payload = if login {
         format!("nonce={nonce}&return_sso_url={returnto}")
     }
