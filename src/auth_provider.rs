@@ -13,5 +13,9 @@ pub enum Failure {
 }
 
 pub trait AuthProvider {
-    async fn login(&self, username: &str, password: &str) -> Result<String, Failure>; 
+    async fn login(
+        &self,
+        username: &str,
+        password: &str
+    ) -> Result<String, Failure>;
 }
