@@ -23,6 +23,7 @@ use tower_http::cors::CorsLayer;
 mod app;
 mod avatar;
 mod auth_provider;
+mod config;
 mod core;
 mod db;
 mod discourse;
@@ -37,6 +38,7 @@ mod sso;
 
 use crate::{
     app::AppState,
+    config::{Config, ConfigArc},
     core::CoreArc,
     discourse::DiscourseAuth,
     errors::{AppError, HttpError},
@@ -84,6 +86,9 @@ impl IntoResponse for AppError {
             AppError::InternalError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "TODO!".into())
             },
+            AppError::DatabaseError(e) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            },
             AppError::ServerError(e)
             | AppError::ClientError(e) => {
                 match StatusCode::from_u16(e.status) {
@@ -91,6 +96,13 @@ impl IntoResponse for AppError {
                     // should not happen
                     Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, e.message)
                 }
+            },
+            AppError::RequestError(e) => {
+                eprintln!("{e}");
+                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            },
+            AppError::SsoError(e) => {
+                (StatusCode::UNAUTHORIZED, "Unauthorized".into())
             }
         };
 
@@ -102,22 +114,13 @@ impl IntoResponse for AppError {
     }
 }
 
-#[derive(Debug)]
-struct Config {
-    discourse_url: String,
-    jwt_key: Vec<u8>,
-    api_base_path: String,
-    db_path: String,
-    listen_ip: [u8; 4],
-    listen_port: u16
-}
-
-fn routes(config: &Config) -> Router<AppState> {
-    let auth = DiscourseAuth::new(&config.discourse_url);
-    let issuer = JWTIssuer::new(&config.jwt_key);
+fn routes(
+    api: &str,
+    auth: DiscourseAuth,
+    issuer: JWTIssuer
+) -> Router<AppState>
+{
     let login_post = move |body| handlers::login_post(body, auth, issuer);
-
-    let api = &config.api_base_path;
 
     Router::new()
         .route(
@@ -145,8 +148,8 @@ fn routes(config: &Config) -> Router<AppState> {
             get(handlers::sso_logout_get)
         )
         .route(
-            &format!("{api}/users/:user/avatar/:size"),
-            get(handlers::users_user_avatar_get)
+            &format!("{api}/users/:username/avatar/:size"),
+            get(handlers::users_username_avatar_size_get)
         )
         .layer(
             ServiceBuilder::new()
@@ -154,33 +157,43 @@ fn routes(config: &Config) -> Router<AppState> {
         )
 }
 
+// TODO: rate limiting
+
 #[tokio::main]
 async fn main() {
+    let listen_ip = [0, 0, 0, 0];
+    let listen_port = 4000;
+    
+    let db_path = "users.db";
+    let api_base_path = "/api/v1";
+
     let config = Config {
         discourse_url: "https://forum.vassalengine.org".into(),
+        // discourse connect provider secrets *
+        discourse_shared_secret: b"=WW,GKV9Jgk)j\"h".into(),
         jwt_key: b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z".to_vec(),
-        api_base_path: "/api/v1".into(),
-        db_path: "users.db".into(),
-        listen_ip: [0, 0, 0, 0],
-        listen_port: 4000
     };
 
 // TODO: handle error?
     let db_pool = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(&format!("sqlite://{}", &config.db_path))
+        .connect(&format!("sqlite://{}", db_path))
         .await
         .unwrap();
+
+    let auth = DiscourseAuth::new(&config.discourse_url);
+    let issuer = JWTIssuer::new(&config.jwt_key);
 
     let core = ProdCore {
         db: SqlxDatabaseClient(db_pool)
     };
 
     let state = AppState {
+        config: Arc::new(config) as ConfigArc,
         core: Arc::new(core) as CoreArc
     };
 
-    let app = routes(&config)
+    let app = routes(api_base_path, auth, issuer)
         .with_state(state)
         .layer(
             ServiceBuilder::new().layer(
@@ -195,8 +208,10 @@ async fn main() {
             .rate_limit(5, Duration::from_secs(1))
         );
 
-    let addr = SocketAddr::from((config.listen_ip, config.listen_port));
-    let listener = TcpListener::bind(addr).await.unwrap();
+    let addr = SocketAddr::from((listen_ip, listen_port));
+    let listener = TcpListener::bind(addr)
+        .await
+        .unwrap();
     serve(listener, app)
         .await
         .unwrap();

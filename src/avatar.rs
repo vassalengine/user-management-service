@@ -4,8 +4,7 @@ use reqwest::{
     header::ACCEPT
 };
 use serde::Deserialize;
-
-use crate::auth_provider::{Error, Failure};
+use thiserror::Error;
 
 #[derive(Deserialize)]
 struct User {
@@ -17,32 +16,42 @@ struct Reply {
     user: User
 }
 
-//pub async fn get_avatar(client: &Client, url: &str) -> Result<String, Failure> {
+#[derive(Debug, Error)]
+pub enum RequestError {
+    #[error("request to Discourse failed: {0}")]
+    ClientError(#[from] reqwest::Error),
+    #[error("request to Discourse failed: {0}: {1} {2}")]
+    HttpError(String, u16, String)
+} 
+
+// TODO: special handling for 429
+
 pub async fn get_avatar_template(
     discourse_url: &str,
     username: &str
-) -> Result<String, Failure> {
+) -> Result<String, RequestError> {
     let url = format!("{discourse_url}/u/{username}.json");
 
     // TODO: pass in client?
-    let client = Client::builder().build().unwrap();
+    let client = Client::builder().build()?;
 
-    // do the GET
-    let response = client.get(url)
+    // Do the GET
+    let response = client.get(&url)
         .header(ACCEPT, APPLICATION_JSON.as_ref())
         .send()
-        .await?
-        .error_for_status()?;
+        .await?;
 
-    // non-200 results are errors
-    if response.status() != StatusCode::OK {
-        return Err(Failure::Error(
-            Error {
-                status: Some(response.status().as_u16()),
-                message: response.text().await.unwrap_or_else(|e| e.to_string())
-            }
-        ));
+    // Anything except 200 is an error
+    match response.status() {
+        StatusCode::OK => Ok(
+            response.json::<Reply>().await?.user.avatar_template
+        ),
+        _ => Err(
+            RequestError::HttpError(
+                url,
+                response.status().as_u16(),
+                response.text().await.unwrap_or("".into())
+            )
+        )
     }
-
-    Ok(response.json::<Reply>().await?.user.avatar_template)
 }

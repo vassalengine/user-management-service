@@ -1,12 +1,13 @@
 use axum::{
-    extract::{Path, Query},
+    extract::{Path, Query, State},
     response::{Json, Redirect}
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 
 use crate::{
+    app::AppState,
     auth_provider::AuthProvider,
-    avatar::get_avatar_template,
+    config::{Config, ConfigArc},
     errors::AppError,
     jwt_provider::Issuer,
     model::{LoginParams, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, Token},
@@ -31,20 +32,16 @@ where
     Ok(Json(Token { token }))
 }
 
-// discourse connect provider secrets *
-// TODO: make these configurable
-const SHARED_SECRET: &[u8] = b"DSQh*Q`HQF$!hz2SuSl@";
-const DISCOURSE_URL: &str = "https://forum.vassalengine.org";
-
 fn start_sso_request(
+    config: &Config,
     params: &SsoLoginParams,
     jar: CookieJar,
     login: bool
 ) -> Result<(CookieJar, Redirect), AppError>
 {
     let (nonce, url) = make_sso_request(
-        SHARED_SECRET,
-        DISCOURSE_URL,
+        &config.discourse_shared_secret,
+        &config.discourse_url,
         &params.returnto,
         login
     );
@@ -59,35 +56,39 @@ fn start_sso_request(
 
 pub async fn sso_login_get(
     Query(params): Query<SsoLoginParams>,
-    jar: CookieJar
+    jar: CookieJar,
+    State(config): State<ConfigArc>
 ) -> Result<(CookieJar, Redirect), AppError> {
-    start_sso_request(&params, jar, true)
+    start_sso_request(&config, &params, jar, true)
 }
 
 pub async fn sso_logout_get(
     Query(params): Query<SsoLoginParams>,
-    jar: CookieJar
+    jar: CookieJar,
+    State(config): State<ConfigArc>
 ) -> Result<(CookieJar, Redirect), AppError> {
-    start_sso_request(&params, jar, false)
+    start_sso_request(&config, &params, jar, false)
 }
 
 pub async fn sso_complete_login_get(
     Query(params): Query<SsoLoginResponseParams>,
-    jar: CookieJar
+    jar: CookieJar,
+    State(config): State<ConfigArc>
 ) -> Result<(CookieJar, Redirect), AppError>
 {
     let nonce_expected = jar.get("nonce")
-        .ok_or(AppError::InternalError)?
+        .ok_or(AppError::Unauthorized)?
         .value()
         .to_owned();
 
     let (username, name) = verify_sso_response(
-            SHARED_SECRET,
-            &nonce_expected,
-            &params.sso,
-            &params.sig
-        )
-        .or(Err(AppError::InternalError))?;
+        &config.discourse_shared_secret,
+        &nonce_expected,
+        &params.sso,
+        &params.sig
+    )?;
+
+    // TODO: issue JWT and return it with the cookies
 
     let jar = if let Some(name) = name {
         jar.add(Cookie::build(("name", name)).path("/"))
@@ -116,14 +117,19 @@ pub async fn sso_complete_logout_get(
     )
 }
 
-pub async fn users_user_avatar_get(
-    Path((username, size)): Path<(String, u32)>
+#[axum::debug_handler]
+pub async fn users_username_avatar_size_get(
+    Path((username, size)): Path<(String, u32)>,
+    State(state): State<AppState>
 ) -> Result<Redirect, AppError>
 {
-    let avatar_template = get_avatar_template(DISCOURSE_URL, &username).await?;
-    let avatar_url = format!(
-        "{DISCOURSE_URL}{}",
-        avatar_template.replace("{size}", &size.to_string())
-    );
-    Ok(Redirect::to(&avatar_url))
+    Ok(
+        Redirect::to(
+            &state.core.get_avatar_url(
+                &state.config.discourse_url,
+                &username,
+                size
+            ).await?
+        )
+    )
 }
