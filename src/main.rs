@@ -6,7 +6,12 @@ use axum::{
     routing::{get, post}
 };
 use serde_json::json;
-use std::{net::SocketAddr, time::Duration};
+use sqlx::sqlite::SqlitePoolOptions;
+use std::{
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration
+};
 use tokio::net::TcpListener;
 use tower::{
     ServiceBuilder,
@@ -15,20 +20,29 @@ use tower::{
 };
 use tower_http::cors::CorsLayer;
 
+mod app;
 mod avatar;
 mod auth_provider;
+mod core;
+mod db;
 mod discourse;
 mod errors;
 mod handlers;
 mod jwt;
 mod jwt_provider;
 mod model;
+mod prod_core;
+mod sqlite;
 mod sso;
 
 use crate::{
+    app::AppState,
+    core::CoreArc,
     discourse::DiscourseAuth,
     errors::{AppError, HttpError},
-    jwt::JWTIssuer
+    jwt::JWTIssuer,
+    prod_core::ProdCore,
+    sqlite::SqlxDatabaseClient
 };
 
 impl From<auth_provider::Failure> for AppError {
@@ -93,11 +107,12 @@ struct Config {
     discourse_url: String,
     jwt_key: Vec<u8>,
     api_base_path: String,
+    db_path: String,
     listen_ip: [u8; 4],
     listen_port: u16
 }
 
-fn routes(config: &Config) -> Router {
+fn routes(config: &Config) -> Router<AppState> {
     let auth = DiscourseAuth::new(&config.discourse_url);
     let issuer = JWTIssuer::new(&config.jwt_key);
     let login_post = move |body| handlers::login_post(body, auth, issuer);
@@ -145,22 +160,40 @@ async fn main() {
         discourse_url: "https://forum.vassalengine.org".into(),
         jwt_key: b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z".to_vec(),
         api_base_path: "/api/v1".into(),
+        db_path: "users.db".into(),
         listen_ip: [0, 0, 0, 0],
         listen_port: 4000
     };
 
-    let app = routes(&config).layer(
-        ServiceBuilder::new().layer(
-            HandleErrorLayer::new(|err: BoxError| async move {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Unhandled error: {}", err)
-                )
-            })
-        )
-        .buffer(1024)
-        .rate_limit(5, Duration::from_secs(1))
-    );
+// TODO: handle error?
+    let db_pool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&format!("sqlite://{}", &config.db_path))
+        .await
+        .unwrap();
+
+    let core = ProdCore {
+        db: SqlxDatabaseClient(db_pool)
+    };
+
+    let state = AppState {
+        core: Arc::new(core) as CoreArc
+    };
+
+    let app = routes(&config)
+        .with_state(state)
+        .layer(
+            ServiceBuilder::new().layer(
+                HandleErrorLayer::new(|err: BoxError| async move {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled error: {}", err)
+                    )
+                })
+            )
+            .buffer(1024)
+            .rate_limit(5, Duration::from_secs(1))
+        );
 
     let addr = SocketAddr::from((config.listen_ip, config.listen_port));
     let listener = TcpListener::bind(addr).await.unwrap();
