@@ -171,7 +171,7 @@ async fn main() {
         discourse_url: "https://forum.vassalengine.org".into(),
         // discourse connect provider secrets *
         discourse_shared_secret: b"=WW,GKV9Jgk)j\"h".into(),
-        jwt_key: b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z".to_vec(),
+        jwt_key: b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z".into(),
     };
 
 // TODO: handle error?
