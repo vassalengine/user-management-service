@@ -20,6 +20,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         username: &str,
         size: u32
     ) -> Result<String, AppError> {
+        // get the avatar template
         let tmpl = match self.db.get_user_avatar_template(username).await? {
             Some(tmpl) => tmpl,
             None => {
@@ -29,6 +30,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
             }
         };
 
+        // make a URL from the template
         let avatar_url = format!(
             "{discourse_url}{}",
             tmpl.replace("{size}", &size.to_string())
