@@ -213,6 +213,7 @@ mod test {
     use super::*;
 
     use axum::{
+        async_trait,
         body::{self, Body, Bytes},
         http::{
             Method, Request,
@@ -256,7 +257,7 @@ mod test {
     #[derive(Clone)]
     struct NoAuthCore;
 
-    #[axum::async_trait]
+    #[async_trait]
     impl Core for NoAuthCore {}
 
     fn test_state_no_auth() -> AppState {
@@ -268,7 +269,7 @@ mod test {
     #[derive(Clone)]
     struct OkAuthCore;
 
-    #[axum::async_trait]
+    #[async_trait]
     impl Core for OkAuthCore {
         async fn login(
             &self,
@@ -289,7 +290,7 @@ mod test {
     #[derive(Clone)]
     struct FailAuthCore;
 
-    #[axum::async_trait]
+    #[async_trait]
     impl Core for FailAuthCore {
         async fn login(
             &self,
@@ -310,7 +311,7 @@ mod test {
     #[derive(Clone)]
     struct ErrorAuthCore;
 
-    #[axum::async_trait]
+    #[async_trait]
     impl Core for ErrorAuthCore {
         async fn login(
             &self,

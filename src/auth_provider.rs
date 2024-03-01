@@ -1,3 +1,4 @@
+use axum::async_trait;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -12,6 +13,7 @@ pub enum Failure {
     Error(Error)
 }
 
+#[async_trait]
 pub trait AuthProvider {
     async fn login(
         &self,

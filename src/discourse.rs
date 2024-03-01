@@ -1,5 +1,4 @@
-use crate::auth_provider::{AuthProvider, Error, Failure};
-
+use axum::async_trait;
 use mime::APPLICATION_JSON;
 use reqwest::{
     Client, StatusCode,
@@ -7,6 +6,8 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use crate::auth_provider::{AuthProvider, Error, Failure};
 
 impl From<reqwest::Error> for Failure {
     fn from(e: reqwest::Error) -> Self {
@@ -118,6 +119,7 @@ impl DiscourseAuth {
     }
 }
 
+#[async_trait]
 impl AuthProvider for DiscourseAuth {
     async fn login(&self, username: &str, password: &str) -> Result<String, Failure> {
         let csrf = get_csrf(&self.client, &self.csrf_url).await?;
