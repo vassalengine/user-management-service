@@ -23,7 +23,6 @@ use tower_http::cors::CorsLayer;
 mod app;
 mod avatar;
 mod auth_provider;
-mod config;
 mod core;
 mod db;
 mod discourse;
@@ -38,7 +37,6 @@ mod sso;
 
 use crate::{
     app::AppState,
-    config::{AuthArc, IssuerArc},
     core::CoreArc,
     discourse::DiscourseAuth,
     errors::{AppError, HttpError},
