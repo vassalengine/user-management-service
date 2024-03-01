@@ -15,7 +15,12 @@ struct Claims {
     exp: u64
 }
 
-fn issue(key: &EncodingKey, username: &str, expiry: u64) -> Result<String, Error> {
+fn issue(
+    key: &EncodingKey,
+    username: &str,
+    expiry: u64
+) -> Result<String, Error>
+{
     let claims = Claims {
         sub: username.into(),
         exp: expiry
