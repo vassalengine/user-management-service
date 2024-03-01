@@ -7,41 +7,32 @@ use axum_extra::extract::cookie::{Cookie, CookieJar};
 use crate::{
     app::AppState,
     auth_provider::AuthProvider,
-    config::{Config, ConfigArc},
+    core::CoreArc,
     errors::AppError,
     jwt_provider::Issuer,
-    model::{LoginParams, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, Token},
-    sso::{make_sso_request, verify_sso_response}
+    model::{LoginParams, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, Token}
 };
 
 pub async fn root_get() -> &'static str {
     "hello world"
 }
 
-pub async fn login_post<A, I>(
-    Json(params): Json<LoginParams>,
-    auth: A,
-    issuer: I
+pub async fn login_post(
+    State(state): State<AppState>,
+    Json(params): Json<LoginParams>
 ) -> Result<Json<Token>, AppError>
-where
-    A: AuthProvider,
-    I: Issuer
 {
-    let _r = auth.login(&params.username, &params.password).await?;
-    let token = issuer.issue(&params.username, 8 * 60 * 60)?;
-    Ok(Json(Token { token }))
+    Ok(Json(state.core.login(&params.username, &params.password).await?))
 }
 
 fn start_sso_request(
-    config: &Config,
+    core: &CoreArc,
     params: &SsoLoginParams,
     jar: CookieJar,
     login: bool
 ) -> Result<(CookieJar, Redirect), AppError>
 {
-    let (nonce, url) = make_sso_request(
-        &config.discourse_shared_secret,
-        &config.discourse_url,
+    let (nonce, url) = core.build_sso_request(
         &params.returnto,
         login
     );
@@ -57,23 +48,23 @@ fn start_sso_request(
 pub async fn sso_login_get(
     Query(params): Query<SsoLoginParams>,
     jar: CookieJar,
-    State(config): State<ConfigArc>
+    State(state): State<AppState>
 ) -> Result<(CookieJar, Redirect), AppError> {
-    start_sso_request(&config, &params, jar, true)
+    start_sso_request(&state.core, &params, jar, true)
 }
 
 pub async fn sso_logout_get(
     Query(params): Query<SsoLoginParams>,
     jar: CookieJar,
-    State(config): State<ConfigArc>
+    State(state): State<AppState>
 ) -> Result<(CookieJar, Redirect), AppError> {
-    start_sso_request(&config, &params, jar, false)
+    start_sso_request(&state.core, &params, jar, false)
 }
 
 pub async fn sso_complete_login_get(
     Query(params): Query<SsoLoginResponseParams>,
     jar: CookieJar,
-    State(config): State<ConfigArc>
+    State(state): State<AppState>
 ) -> Result<(CookieJar, Redirect), AppError>
 {
     let nonce_expected = jar.get("nonce")
@@ -81,8 +72,7 @@ pub async fn sso_complete_login_get(
         .value()
         .to_owned();
 
-    let (username, name) = verify_sso_response(
-        &config.discourse_shared_secret,
+    let (username, name) = state.core.verify_sso_response(
         &nonce_expected,
         &params.sso,
         &params.sig
@@ -117,7 +107,6 @@ pub async fn sso_complete_logout_get(
     )
 }
 
-#[axum::debug_handler]
 pub async fn users_username_avatar_size_get(
     Path((username, size)): Path<(String, u32)>,
     State(state): State<AppState>
@@ -126,7 +115,6 @@ pub async fn users_username_avatar_size_get(
     Ok(
         Redirect::to(
             &state.core.get_avatar_url(
-                &state.config.discourse_url,
                 &username,
                 size
             ).await?

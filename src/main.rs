@@ -38,7 +38,7 @@ mod sso;
 
 use crate::{
     app::AppState,
-    config::{Config, ConfigArc},
+    config::{AuthArc, IssuerArc},
     core::CoreArc,
     discourse::DiscourseAuth,
     errors::{AppError, HttpError},
@@ -101,7 +101,7 @@ impl IntoResponse for AppError {
                 eprintln!("{e}");
                 (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             },
-            AppError::SsoError(e) => {
+            AppError::SsoError(_) => {
                 (StatusCode::UNAUTHORIZED, "Unauthorized".into())
             }
         };
@@ -114,14 +114,7 @@ impl IntoResponse for AppError {
     }
 }
 
-fn routes(
-    api: &str,
-    auth: DiscourseAuth,
-    issuer: JWTIssuer
-) -> Router<AppState>
-{
-    let login_post = move |body| handlers::login_post(body, auth, issuer);
-
+fn routes(api: &str) -> Router<AppState> {
     Router::new()
         .route(
             &format!("{api}/"),
@@ -129,7 +122,7 @@ fn routes(
         )
         .route(
             &format!("{api}/login"),
-            post(login_post)
+            post(handlers::login_post)
         )
         .route(
             &format!("{api}/sso/completeLogin"),
@@ -167,12 +160,10 @@ async fn main() {
     let db_path = "users.db";
     let api_base_path = "/api/v1";
 
-    let config = Config {
-        discourse_url: "https://forum.vassalengine.org".into(),
-        // discourse connect provider secrets *
-        discourse_shared_secret: b"=WW,GKV9Jgk)j\"h".into(),
-        jwt_key: b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z".into(),
-    };
+    let jwt_key = b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z";
+    let discourse_url = "https://forum.vassalengine.org";
+    // See: discourse connect provider secrets *
+    let discourse_shared_secret = b"";
 
 // TODO: handle error?
     let db_pool = SqlitePoolOptions::new()
@@ -181,19 +172,19 @@ async fn main() {
         .await
         .unwrap();
 
-    let auth = DiscourseAuth::new(&config.discourse_url);
-    let issuer = JWTIssuer::new(&config.jwt_key);
-
     let core = ProdCore {
-        db: SqlxDatabaseClient(db_pool)
+        db: SqlxDatabaseClient(db_pool),
+        discourse_url: discourse_url.into(),
+        discourse_shared_secret: discourse_shared_secret.into(),
+        auth: DiscourseAuth::new(&discourse_url),
+        issuer: JWTIssuer::new(jwt_key)
     };
 
     let state = AppState {
-        config: Arc::new(config) as ConfigArc,
         core: Arc::new(core) as CoreArc
     };
 
-    let app = routes(api_base_path, auth, issuer)
+    let app = routes(api_base_path)
         .with_state(state)
         .layer(
             ServiceBuilder::new().layer(
@@ -235,6 +226,7 @@ mod test {
 
     use crate::{
         auth_provider::{AuthProvider, Failure},
+        core::Core,
         jwt_provider::Issuer,
         model::{LoginParams, Token}
     };
@@ -253,127 +245,100 @@ mod test {
         body_bytes(r).await.is_empty()
     }
 
-    struct FakeIssuer;
+    async fn try_request(state: AppState, request: Request<Body>) -> Response {
+        routes(API_V1)
+            .with_state(state)
+            .oneshot(request)
+            .await
+            .unwrap()
+    }
 
-    impl Issuer for FakeIssuer {
-        fn issue(
-            &self,
-            _username: &str,
-            _duration: u64
-        ) -> Result<String, jwt_provider::Error>
-        {
-            Ok("woohoo".into())
+    #[derive(Clone)]
+    struct NoAuthCore;
+
+    #[axum::async_trait]
+    impl Core for NoAuthCore {}
+
+    fn test_state_no_auth() -> AppState {
+        AppState {
+            core: Arc::new(NoAuthCore) as CoreArc
         }
     }
 
-    struct NoAuth;
+    #[derive(Clone)]
+    struct OkAuthCore;
 
-    impl AuthProvider for NoAuth {
+    #[axum::async_trait]
+    impl Core for OkAuthCore {
         async fn login(
             &self,
             _username: &str,
-            _password: &str
-        ) -> Result<String, Failure>
+            _password: &str,
+        ) -> Result<Token, AppError>
         {
-            Err(Failure::Error(auth_provider::Error {
-                status: Some(500),
-                message: "Should never be called".into()
-            }))
+            Ok(Token { token: "woohoo".into() })
         }
     }
 
-    fn test_app_no_auth() -> Router {
-        Router::new()
-            .route(formatcp!("{API_V1}/"), get(handlers::root_get))
-            .route(
-                formatcp!("{API_V1}/login"),
-                post(|body| handlers::login_post(body, NoAuth, FakeIssuer))
-            )
+    fn test_state_ok_auth() -> AppState {
+        AppState {
+            core: Arc::new(OkAuthCore) as CoreArc
+        }
     }
 
-    struct OkAuth;
+    #[derive(Clone)]
+    struct FailAuthCore;
 
-    impl AuthProvider for OkAuth {
+    #[axum::async_trait]
+    impl Core for FailAuthCore {
         async fn login(
             &self,
             _username: &str,
-            _password: &str
-        ) -> Result<String, Failure>
+            _password: &str,
+        ) -> Result<Token, AppError>
         {
-            Ok("auth ok".into())
+            Err(AppError::Unauthorized)
         }
     }
 
-    fn test_app_ok_auth() -> Router {
-        Router::new()
-            .route(formatcp!("{API_V1}/"), get(handlers::root_get))
-            .route(
-                formatcp!("{API_V1}/login"),
-                post(|body| handlers::login_post(body, OkAuth, FakeIssuer))
-            )
+    fn test_state_fail_auth() -> AppState {
+        AppState {
+            core: Arc::new(FailAuthCore) as CoreArc
+        }
     }
 
-    struct FailAuth;
+    #[derive(Clone)]
+    struct ErrorAuthCore;
 
-    impl AuthProvider for FailAuth {
+    #[axum::async_trait]
+    impl Core for ErrorAuthCore {
         async fn login(
             &self,
             _username: &str,
-            _password: &str
-        ) -> Result<String, Failure>
+            _password: &str,
+        ) -> Result<Token, AppError>
         {
-            Err(Failure::Unauthorized)
+            Err(AppError::InternalError)
         }
     }
 
-    fn test_app_fail_auth() -> Router {
-        Router::new()
-            .route(formatcp!("{API_V1}/"), get(handlers::root_get))
-            .route(
-                formatcp!("{API_V1}/login"),
-                post(|body| handlers::login_post(body, FailAuth, FakeIssuer))
-            )
-    }
-
-    struct ErrorAuth;
-
-    impl AuthProvider for ErrorAuth {
-        async fn login(
-            &self,
-            _username: &str,
-            _password: &str
-        ) -> Result<String, Failure>
-        {
-            Err(Failure::Error(auth_provider::Error {
-                status: Some(500),
-                message: "Auth provider had an error".into()
-            }))
+    fn test_state_error_auth() -> AppState {
+        AppState {
+            core: Arc::new(ErrorAuthCore) as CoreArc
         }
-    }
-
-    fn test_app_error_auth() -> Router {
-        Router::new()
-            .route(formatcp!("{API_V1}/"), get(handlers::root_get))
-            .route(
-                formatcp!("{API_V1}/login"),
-                post(|body| handlers::login_post(body, ErrorAuth, FakeIssuer))
-            )
     }
 
     #[tokio::test]
     async fn root_ok() {
-        let app = test_app_no_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::GET)
-                    .uri(formatcp!("{API_V1}/"))
-                    .body(Body::empty())
-                    .unwrap()
-            )
-            .await
-            .unwrap();
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/"))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(&body_bytes(response).await[..], b"hello world");
@@ -381,27 +346,24 @@ mod test {
 
     #[tokio::test]
     async fn login_ok() {
-        let app = test_app_ok_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .body(Body::from(
-                        serde_json::to_vec(
-                            &LoginParams {
-                                username: "skroob".into(),
-                                password: "12345".into()
-                            }
-                        )
-                        .unwrap()
-                    ))
+        let response = try_request(
+            test_state_ok_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .body(Body::from(
+                    serde_json::to_vec(
+                        &LoginParams {
+                            username: "skroob".into(),
+                            password: "12345".into()
+                        }
+                    )
                     .unwrap()
+                ))
+                .unwrap()
             )
-            .await
-            .unwrap();
+            .await;
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -412,212 +374,182 @@ mod test {
 
     #[tokio::test]
     async fn login_wrong_method() {
-        let app = test_app_no_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::GET)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .body(Body::empty())
-                    .unwrap()
-            )
-            .await
-            .unwrap();
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/login"))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
     #[tokio::test]
     async fn login_no_content_type() {
-        let app = test_app_no_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .body(Body::from(
-                        serde_json::to_vec(
-                            &LoginParams {
-                                username: "skroob".into(),
-                                password: "12345".into()
-                            }
-                        )
-                        .unwrap()
-                    ))
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .body(Body::from(
+                    serde_json::to_vec(
+                        &LoginParams {
+                            username: "skroob".into(),
+                            password: "12345".into()
+                        }
+                    )
                     .unwrap()
-            )
-            .await
-            .unwrap();
+                ))
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
 
     #[tokio::test]
     async fn login_no_payload() {
-        let app = test_app_no_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .body(Body::empty())
-                    .unwrap()
-            )
-            .await
-            .unwrap();
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
     async fn login_not_json() {
-        let app = test_app_no_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .header(CONTENT_TYPE, TEXT_PLAIN.as_ref())
-                    .body(Body::from("total garbage"))
-                    .unwrap()
-            )
-            .await
-            .unwrap();
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .header(CONTENT_TYPE, TEXT_PLAIN.as_ref())
+                .body(Body::from("total garbage"))
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
 
     #[tokio::test]
     async fn login_no_username() {
-        let app = test_app_no_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .body(Body::from(r#"{ "password": "bob" }"#))
-                    .unwrap()
-            )
-            .await
-            .unwrap();
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .body(Body::from(r#"{ "password": "bob" }"#))
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     #[tokio::test]
     async fn login_no_password() {
-        let app = test_app_no_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .body(Body::from(r#"{ "username": "bob" }"#))
-                    .unwrap()
-            )
-            .await
-            .unwrap();
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .body(Body::from(r#"{ "username": "bob" }"#))
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     #[tokio::test]
     async fn login_usermame_not_string() {
-        let app = test_app_no_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .body(Body::from(r#"{ "username": 3, "password": "x" }"#))
-                    .unwrap()
-            )
-            .await
-            .unwrap();
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .body(Body::from(r#"{ "username": 3, "password": "x" }"#))
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     #[tokio::test]
     async fn login_password_not_string() {
-        let app = test_app_no_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .body(Body::from(r#"{ "username": "x", "password": 3 }"#))
-                    .unwrap()
-            )
-            .await
-            .unwrap();
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .body(Body::from(r#"{ "username": "x", "password": 3 }"#))
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     #[tokio::test]
     async fn login_failed() {
-        let app = test_app_fail_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .body(Body::from(
-                        serde_json::to_vec(
-                            &LoginParams {
-                                username: "skroob".into(),
-                                password: "12345".into()
-                            }
-                        )
-                        .unwrap()
-                    ))
+        let response = try_request(
+            test_state_fail_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .body(Body::from(
+                    serde_json::to_vec(
+                        &LoginParams {
+                            username: "skroob".into(),
+                            password: "12345".into()
+                        }
+                    )
                     .unwrap()
-            )
-            .await
-            .unwrap();
+                ))
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]
     async fn login_error() {
-        let app = test_app_error_auth();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(formatcp!("{API_V1}/login"))
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .body(Body::from(
-                        serde_json::to_vec(
-                            &LoginParams {
-                                username: "skroob".into(),
-                                password: "12345".into()
-                            }
-                        )
-                        .unwrap()
-                    ))
+        let response = try_request(
+            test_state_error_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/login"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .body(Body::from(
+                    serde_json::to_vec(
+                        &LoginParams {
+                            username: "skroob".into(),
+                            password: "12345".into()
+                        }
+                    )
                     .unwrap()
-            )
-            .await
-            .unwrap();
+                ))
+                .unwrap()
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }

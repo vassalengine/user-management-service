@@ -1,12 +1,8 @@
 use axum::extract::FromRef;
 
-use crate::{
-    config::ConfigArc,
-    core::CoreArc,
-};
+use crate::core::CoreArc;
 
 #[derive(Clone, FromRef)]
 pub struct AppState {
-    pub config: ConfigArc,
     pub core: CoreArc
 }

@@ -5,7 +5,7 @@ use sha2::Sha256;
 use std::collections::HashMap;
 use thiserror::Error;
 
-pub fn make_sso_request(
+pub fn build_sso_request(
     shared_secret: &[u8],
     discourse_url: &str,
     returnto: &str,

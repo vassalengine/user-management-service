@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-#[derive(Debug)]
-pub struct Config {
-    pub discourse_url: String,
-    pub discourse_shared_secret: Vec<u8>,
-    pub jwt_key: Vec<u8>
-}
+use crate::{
+    auth_provider::AuthProvider,
+    jwt_provider::Issuer
+};
 
-pub type ConfigArc = Arc<Config>;
+pub type AuthArc = Arc<dyn AuthProvider + Send + Sync>;
+pub type IssuerArc = Arc<dyn Issuer + Send + Sync>;
