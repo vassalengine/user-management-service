@@ -29,7 +29,6 @@ mod discourse;
 mod errors;
 mod handlers;
 mod jwt;
-mod jwt_provider;
 mod model;
 mod prod_core;
 mod sqlite;
@@ -86,6 +85,9 @@ impl IntoResponse for AppError {
             },
             AppError::DatabaseError(e) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            },
+            AppError::JTWError(_) => {
+                (StatusCode::UNAUTHORIZED, "Unauthorized".into())
             },
             AppError::ServerError(e)
             | AppError::ClientError(e) => {

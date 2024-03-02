@@ -1,13 +1,10 @@
-use crate::jwt_provider::Error;
-
 use jsonwebtoken::{encode, decode, get_current_timestamp, Header, Validation, EncodingKey, DecodingKey};
 use serde::{Serialize, Deserialize};
+use thiserror::Error;
 
-impl<E: ToString> From<E> for Error {
-    fn from(e: E) -> Self {
-        Error { message: e.to_string() }    
-    }
-}
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct JWTError(#[from] jsonwebtoken::errors::Error);
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Claims {
@@ -19,7 +16,7 @@ fn issue(
     key: &EncodingKey,
     username: &str,
     expiry: u64
-) -> Result<String, Error>
+) -> Result<String, JWTError>
 {
     let claims = Claims {
         sub: username.into(),
@@ -29,7 +26,7 @@ fn issue(
     Ok(encode(&Header::default(), &claims, key)?)
 }
 
-fn verify(key: &DecodingKey, token_str: &str) -> Result<String, Error> {
+fn verify(key: &DecodingKey, token_str: &str) -> Result<String, JWTError> {
     let token = decode::<Claims>(token_str, key, &Validation::default())?;
     Ok(token.claims.sub)
 }
@@ -45,7 +42,12 @@ impl JWTIssuer {
         }
     }
 
-    pub fn issue(&self, username: &str, duration: u64) -> Result<String, Error> {
+    pub fn issue(
+        &self,
+        username: &str,
+        duration: u64
+    ) -> Result<String, JWTError>
+    {
         issue(&self.key, username, get_current_timestamp() + duration)
     }
 }
@@ -61,7 +63,7 @@ impl JWTVerifier {
         }
     }
 
-    pub fn verify(&self, token: &str) -> Result<String, Error> {
+    pub fn verify(&self, token: &str) -> Result<String, JWTError> {
         verify(&self.key, token)
     }
 }

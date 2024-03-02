@@ -3,6 +3,7 @@ use thiserror::Error;
 use crate::{
     avatar::RequestError,
     db::DatabaseError,
+    jwt::JWTError,
     sso::SsoResponseError
 };
 
@@ -20,6 +21,8 @@ pub enum AppError {
     InternalError,
     #[error("Database error")]
     DatabaseError(#[from] DatabaseError),
+    #[error("JWT error")]
+    JTWError(#[from] JWTError),
     #[error("Server error")]
     ServerError(HttpError),
     #[error("Client error")]
