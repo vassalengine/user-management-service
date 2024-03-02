@@ -53,13 +53,13 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
     fn build_sso_request(
         &self,
         returnto: &str,
-        login: bool
+        is_login: bool
     ) -> (String, String) {
         build_sso_request(
             &self.discourse_shared_secret,
             &self.discourse_url,
             returnto,
-            login
+            is_login
         )
     }
 

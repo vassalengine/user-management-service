@@ -9,7 +9,7 @@ pub fn build_sso_request(
     shared_secret: &[u8],
     discourse_url: &str,
     returnto: &str,
-    login: bool
+    is_login: bool
 ) -> (String, String)
 {
     // generate a nonce
@@ -17,7 +17,7 @@ pub fn build_sso_request(
     let nonce = Alphanumeric.sample_string(&mut rng, 20);
 
     // create a payload with the nonce and the return URL
-    let payload = if login {
+    let payload = if is_login {
         format!("nonce={nonce}&return_sso_url={returnto}")
     }
     else {

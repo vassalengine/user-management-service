@@ -27,12 +27,12 @@ fn start_sso_request(
     core: &CoreArc,
     params: &SsoLoginParams,
     jar: CookieJar,
-    login: bool
+    is_login: bool
 ) -> Result<(CookieJar, Redirect), AppError>
 {
     let (nonce, url) = core.build_sso_request(
         &params.returnto,
-        login
+        is_login
     );
 
     Ok(
