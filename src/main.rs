@@ -65,15 +65,6 @@ impl From<auth_provider::Failure> for AppError {
     }
 }
 
-impl From<jwt_provider::Error> for AppError {
-    fn from(e: jwt_provider::Error) -> Self {
-        AppError::ServerError(HttpError {
-            status: 500,
-            message: e.message
-        })
-    }
-}
-
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
