@@ -12,7 +12,6 @@ use crate::{
     sso::{build_sso_request, verify_sso_response}
 };
 
-#[derive(Clone)]
 pub struct ProdCore<C: DatabaseClient> {
     pub db: C,
     pub discourse_url: String,

@@ -34,7 +34,6 @@ fn verify(key: &DecodingKey, token_str: &str) -> Result<String, Error> {
     Ok(token.claims.sub)
 }
 
-#[derive(Clone)]
 pub struct JWTIssuer {
     key: EncodingKey
 }
