@@ -1,4 +1,4 @@
-use crate::jwt_provider::{Error, Issuer, Verifier};
+use crate::jwt_provider::Error;
 
 use jsonwebtoken::{encode, decode, get_current_timestamp, Header, Validation, EncodingKey, DecodingKey};
 use serde::{Serialize, Deserialize};
@@ -45,10 +45,8 @@ impl JWTIssuer {
             key: EncodingKey::from_secret(key)
         }
     }
-}
 
-impl Issuer for JWTIssuer {
-    fn issue(&self, username: &str, duration: u64) -> Result<String, Error> {
+    pub fn issue(&self, username: &str, duration: u64) -> Result<String, Error> {
         issue(&self.key, username, get_current_timestamp() + duration)
     }
 }
@@ -63,10 +61,8 @@ impl JWTVerifier {
             key: DecodingKey::from_secret(key)
         }
     }
-}
 
-impl Verifier for JWTVerifier {
-    fn verify(&self, token: &str) -> Result<String, Error> {
+    pub fn verify(&self, token: &str) -> Result<String, Error> {
         verify(&self.key, token)
     }
 }

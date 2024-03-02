@@ -8,7 +8,6 @@ use crate::{
     discourse::DiscourseAuth,
     errors::AppError,
     jwt::JWTIssuer,
-    jwt_provider::Issuer,
     model::Token,
     sso::{build_sso_request, verify_sso_response}
 };
