@@ -6,10 +6,8 @@ use axum_extra::extract::cookie::{Cookie, CookieJar};
 
 use crate::{
     app::AppState,
-    auth_provider::AuthProvider,
     core::CoreArc,
     errors::AppError,
-    jwt_provider::Issuer,
     model::{LoginParams, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, Token}
 };
 

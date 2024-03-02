@@ -224,9 +224,7 @@ mod test {
     use tower::ServiceExt; // for oneshot
 
     use crate::{
-        auth_provider::{AuthProvider, Failure},
         core::Core,
-        jwt_provider::Issuer,
         model::{LoginParams, Token}
     };
 
