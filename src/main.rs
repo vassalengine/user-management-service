@@ -266,6 +266,14 @@ mod test {
             &self,
             _username: &str,
             _password: &str,
+        ) -> Result<(), AppError>
+        {
+            Ok(())
+        }
+
+        fn issue_jwt(
+            &self,
+            _username: &str,
         ) -> Result<Token, AppError>
         {
             Ok(Token { token: "woohoo".into() })
@@ -287,7 +295,7 @@ mod test {
             &self,
             _username: &str,
             _password: &str,
-        ) -> Result<Token, AppError>
+        ) -> Result<(), AppError>
         {
             Err(AppError::Unauthorized)
         }
@@ -308,7 +316,7 @@ mod test {
             &self,
             _username: &str,
             _password: &str,
-        ) -> Result<Token, AppError>
+        ) -> Result<(), AppError>
         {
             Err(AppError::InternalError)
         }

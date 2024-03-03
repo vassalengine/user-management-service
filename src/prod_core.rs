@@ -85,11 +85,26 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         &self,
         username: &str,
         password: &str,
+    ) -> Result<(), AppError>
+    {
+        self.auth.login(username, password).await?;
+        Ok(())
+    }
+
+    fn issue_jwt(
+        &self,
+        username: &str
     ) -> Result<Token, AppError>
     {
-        let _r = self.auth.login(username, password).await?;
-        let token = self.issuer.issue(username, 8 * 60 * 60)?;
-        Ok(Token { token })
+        Ok(
+            Token {
+                token: self.issuer.issue(
+                    username,
+                    (self.now)().timestamp(),
+                    8 * 60 * 60
+                )?
+            }
+        )
     }
 }
 

@@ -37,6 +37,14 @@ pub trait Core {
         &self,
         _username: &str,
         _password: &str,
+    ) -> Result<(), AppError>
+    {
+        unimplemented!();
+    }
+
+    fn issue_jwt(
+        &self,
+        _username: &str
     ) -> Result<Token, AppError>
     {
         unimplemented!();
