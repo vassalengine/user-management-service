@@ -5,6 +5,7 @@ use axum::{
     response::{IntoResponse, Json, Response},
     routing::{get, post}
 };
+use chrono::Utc;
 use serde_json::json;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{
@@ -167,6 +168,7 @@ async fn main() {
         db: SqlxDatabaseClient(db_pool),
         discourse_url: discourse_url.into(),
         discourse_shared_secret: discourse_shared_secret.into(),
+        now: Utc::now,
         auth: DiscourseAuth::new(&discourse_url),
         issuer: JWTIssuer::new(jwt_key)
     };

@@ -1,4 +1,5 @@
 use axum::async_trait;
+use chrono::{DateTime, Utc};
 
 use crate::{
     avatar::get_avatar_template,
@@ -16,6 +17,7 @@ pub struct ProdCore<C: DatabaseClient> {
     pub db: C,
     pub discourse_url: String,
     pub discourse_shared_secret: Vec<u8>,
+    pub now: fn() -> DateTime<Utc>,
     pub auth: DiscourseAuth,
     pub issuer: JWTIssuer
 }

@@ -9,17 +9,20 @@ pub struct JWTError(#[from] jsonwebtoken::errors::Error);
 #[derive(Debug, Deserialize, Serialize)]
 struct Claims {
     sub: String,
-    exp: u64
+    iat: i64,
+    exp: i64
 }
 
 fn issue(
     key: &EncodingKey,
     username: &str,
-    expiry: u64
+    now: i64,
+    expiry: i64
 ) -> Result<String, JWTError>
 {
     let claims = Claims {
         sub: username.into(),
+        iat: now,
         exp: expiry
     };
 
@@ -45,10 +48,11 @@ impl JWTIssuer {
     pub fn issue(
         &self,
         username: &str,
-        duration: u64
+        now: i64,
+        duration: i64
     ) -> Result<String, JWTError>
     {
-        issue(&self.key, username, get_current_timestamp() + duration)
+        issue(&self.key, username, now, now + duration)
     }
 }
 
@@ -77,8 +81,8 @@ mod test {
     #[test]
     fn issue_ok() {
         let key = EncodingKey::from_secret(KEY);
-        let tok = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJza3Jvb2IiLCJleHAiOjE2OTM4NzA0MDB9.V_54o3AwhkPcIdP-2Pea3MJ2vS82hF8EA0wFseCv3ho";
-        assert_eq!(issue(&key, "skroob", 1693870400).unwrap(), tok);
+        let tok = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJza3Jvb2IiLCJpYXQiOjAsImV4cCI6MTY5Mzg3MDQwMH0.iAuKl7Q-ufqXYXGhxXYmyIUx0VO8rKEtNHMxZ8iw3CU";
+        assert_eq!(issue(&key, "skroob", 0, 1693870400).unwrap(), tok);
     }
 
     #[test]
@@ -91,10 +95,10 @@ mod test {
 
         /*
             {"typ": "JWT","alg": "HS256"}
-            {"sub": "skroob", "exp": 899999999999}
+            {"sub": "skroob", "iat": 0, "exp": 899999999999}
         */
         let key = DecodingKey::from_secret(KEY);
-        let tok = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJza3Jvb2IiLCJleHAiOjg5OTk5OTk5OTk5OX0.9fL6Jbac5rsqs5G0h-0xkLaC2_m2lk0sZkfO3-1UnCQ";
+        let tok = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJza3Jvb2IiLCJpYXQiOjAsImV4cCI6ODk5OTk5OTk5OTk5fQ.eMEa-zrRyWnnoFn2FsTuv-Q40ah6vbE10Dw4JLuKbZ8";
         assert_eq!(verify(&key, tok).unwrap(), "skroob");
     }
 

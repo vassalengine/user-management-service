@@ -13,6 +13,7 @@ axum = { version = "^0.7", features = ["http1", "http2", "json", "macros", "quer
 axum-extra = { version = "^0.9", features = ["cookie"] }
 base64 = "^0.21"
 const_format = "^0.2"
+chrono = "^0.4"
 digest = { version = "^0.10", features = ["mac"] }
 hex = "^0.4"
 hmac = "^0.12"
