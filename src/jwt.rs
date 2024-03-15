@@ -8,20 +8,20 @@ pub struct JWTError(#[from] jsonwebtoken::errors::Error);
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Claims {
-    sub: String,
+    sub: i64,
     iat: i64,
     exp: i64
 }
 
 fn issue(
     key: &EncodingKey,
-    username: &str,
+    uid: i64,
     now: i64,
     expiry: i64
 ) -> Result<String, JWTError>
 {
     let claims = Claims {
-        sub: username.into(),
+        sub: uid,
         iat: now,
         exp: expiry
     };
@@ -29,7 +29,7 @@ fn issue(
     Ok(encode(&Header::default(), &claims, key)?)
 }
 
-fn verify(key: &DecodingKey, token_str: &str) -> Result<String, JWTError> {
+fn verify(key: &DecodingKey, token_str: &str) -> Result<i64, JWTError> {
     let token = decode::<Claims>(token_str, key, &Validation::default())?;
     Ok(token.claims.sub)
 }
@@ -47,12 +47,12 @@ impl JWTIssuer {
 
     pub fn issue(
         &self,
-        username: &str,
+        uid: i64,
         now: i64,
         duration: i64
     ) -> Result<String, JWTError>
     {
-        issue(&self.key, username, now, now + duration)
+        issue(&self.key, uid, now, now + duration)
     }
 }
 
@@ -67,7 +67,7 @@ impl JWTVerifier {
         }
     }
 
-    pub fn verify(&self, token: &str) -> Result<String, JWTError> {
+    pub fn verify(&self, token: &str) -> Result<i64, JWTError> {
         verify(&self.key, token)
     }
 }
@@ -81,8 +81,8 @@ mod test {
     #[test]
     fn issue_ok() {
         let key = EncodingKey::from_secret(KEY);
-        let tok = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJza3Jvb2IiLCJpYXQiOjAsImV4cCI6MTY5Mzg3MDQwMH0.iAuKl7Q-ufqXYXGhxXYmyIUx0VO8rKEtNHMxZ8iw3CU";
-        assert_eq!(issue(&key, "skroob", 0, 1693870400).unwrap(), tok);
+        let tok = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjQyLCJpYXQiOjAsImV4cCI6MTY5Mzg3MDQwMH0.qhkix8B5de6C1sJLPjUHwpMjU5xdP2YscqJtGOMb1Nc";
+        assert_eq!(issue(&key, 42, 0, 1693870400).unwrap(), tok);
     }
 
     #[test]
@@ -95,11 +95,11 @@ mod test {
 
         /*
             {"typ": "JWT","alg": "HS256"}
-            {"sub": "skroob", "iat": 0, "exp": 899999999999}
+            {"sub": 42, "iat": 0, "exp": 899999999999}
         */
         let key = DecodingKey::from_secret(KEY);
-        let tok = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJza3Jvb2IiLCJpYXQiOjAsImV4cCI6ODk5OTk5OTk5OTk5fQ.eMEa-zrRyWnnoFn2FsTuv-Q40ah6vbE10Dw4JLuKbZ8";
-        assert_eq!(verify(&key, tok).unwrap(), "skroob");
+        let tok = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjQyLCJpYXQiOjAsImV4cCI6ODk5OTk5OTk5OTk5fQ.TBKloSqXbgTRVlup1kK-SvOIPBPKWQ2Glx9wtxcCAbY";
+        assert_eq!(verify(&key, tok).unwrap(), 42);
     }
 
     #[test]

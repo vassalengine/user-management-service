@@ -20,8 +20,11 @@ pub async fn login_post(
     Json(params): Json<LoginParams>
 ) -> Result<Json<Token>, AppError>
 {
-    state.core.login(&params.username, &params.password).await?;
-    Ok(Json(state.core.issue_jwt(&params.username)?))
+    let resp = state.core.login(&params.username, &params.password).await?;
+    let uid = resp.pointer("/user/id")
+        .and_then(Value::as_i64)
+        .ok_or(AppError::InternalError)?;
+    Ok(Json(state.core.issue_jwt(uid)?))
 }
 
 fn start_sso_request(
@@ -71,7 +74,7 @@ pub async fn sso_complete_login_get(
         .value()
         .to_owned();
 
-    let (username, name) = state.core.verify_sso_response(
+    let (uid, username, name) = state.core.verify_sso_response(
         &nonce_expected,
         &params.sso,
         &params.sig
@@ -79,7 +82,7 @@ pub async fn sso_complete_login_get(
 
     // TODO: issue JWT and return it with the cookies
 
-    let token = state.core.issue_jwt(&username)?;
+    let token = state.core.issue_jwt(uid)?;
 
     let jar = if let Some(name) = name {
         jar.add(Cookie::build(("name", name)).path("/"))

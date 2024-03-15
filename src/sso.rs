@@ -53,6 +53,8 @@ pub enum SsoResponseError {
     Base64Decoding(#[from] base64::DecodeError),
     #[error("hex decoding failed")]
     HexDecoding(#[from] hex::FromHexError),
+    #[error("missing user id")]
+    MissingUserId,
     #[error("missing username")]
     MissingUsername,
     #[error("response nonce does not match sent nonce")]
@@ -63,12 +65,13 @@ pub enum SsoResponseError {
     Verify(#[from] digest::MacError)
 }
 
+// TODO: test
 pub fn verify_sso_response(
     shared_secret: &[u8],
     nonce_expected: &str,
     sso: &str,
     sig: &str
-) -> Result<(String, Option<String>), SsoResponseError>
+) -> Result<(i64, String, Option<String>), SsoResponseError>
 {
     // compute the digest and check the signature
     let mut mac = Hmac::<Sha256>::new_from_slice(shared_secret)
@@ -95,5 +98,9 @@ pub fn verify_sso_response(
 
     let name = qargs.get("name").cloned();
 
-    Ok((username, name))
+    let uid = qargs.get("external_id")
+        .and_then(|v| v.parse::<i64>().ok())
+        .ok_or(SsoResponseError::MissingUserId)?;
+
+    Ok((uid, username, name))
 }

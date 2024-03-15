@@ -1,5 +1,6 @@
 use axum::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Error {
@@ -19,5 +20,5 @@ pub trait AuthProvider {
         &self,
         username: &str,
         password: &str
-    ) -> Result<String, Failure>;
+    ) -> Result<Value, Failure>;
 }

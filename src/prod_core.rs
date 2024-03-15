@@ -1,5 +1,6 @@
 use axum::async_trait;
 use chrono::{DateTime, Utc};
+use serde_json::Value;
 
 use crate::{
     avatar::get_avatar_template,
@@ -70,7 +71,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         nonce_expected: &str,
         sso: &str,
         sig: &str
-    ) -> Result<(String, Option<String>), AppError> {
+    ) -> Result<(i64, String, Option<String>), AppError> {
         Ok(
             verify_sso_response(
                 &self.discourse_shared_secret,
@@ -85,21 +86,20 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         &self,
         username: &str,
         password: &str,
-    ) -> Result<(), AppError>
+    ) -> Result<Value, AppError>
     {
-        self.auth.login(username, password).await?;
-        Ok(())
+        Ok(self.auth.login(username, password).await?)
     }
 
     fn issue_jwt(
         &self,
-        username: &str
+        uid: i64
     ) -> Result<Token, AppError>
     {
         Ok(
             Token {
                 token: self.issuer.issue(
-                    username,
+                    uid,
                     (self.now)().timestamp(),
                     8 * 60 * 60
                 )?

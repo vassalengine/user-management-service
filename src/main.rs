@@ -216,6 +216,7 @@ mod test {
     use const_format::formatcp;
     use mime::{APPLICATION_JSON, TEXT_PLAIN};
     use serde::Deserialize;
+    use serde_json::{json, Value};
     use tower::ServiceExt; // for oneshot
 
     use crate::{
@@ -266,14 +267,14 @@ mod test {
             &self,
             _username: &str,
             _password: &str,
-        ) -> Result<(), AppError>
+        ) -> Result<Value, AppError>
         {
-            Ok(())
+            Ok(json!({ "user": { "id": 42 } }))
         }
 
         fn issue_jwt(
             &self,
-            _username: &str,
+            _uid: i64,
         ) -> Result<Token, AppError>
         {
             Ok(Token { token: "woohoo".into() })
@@ -295,7 +296,7 @@ mod test {
             &self,
             _username: &str,
             _password: &str,
-        ) -> Result<(), AppError>
+        ) -> Result<Value, AppError>
         {
             Err(AppError::Unauthorized)
         }
@@ -316,7 +317,7 @@ mod test {
             &self,
             _username: &str,
             _password: &str,
-        ) -> Result<(), AppError>
+        ) -> Result<Value, AppError>
         {
             Err(AppError::InternalError)
         }

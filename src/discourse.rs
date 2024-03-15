@@ -74,7 +74,12 @@ enum LoginResult {
     Success(Value)
 }
 
-async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookies: &str) -> Result<String, Failure>
+async fn post_login(
+    client: &Client,
+    url: &str,
+    params: &LoginParams<'_>,
+    cookies: &str
+) -> Result<Value, Failure>
 {
     let response = client.post(url)
         .json(params)
@@ -91,11 +96,11 @@ async fn post_login(client: &Client, url: &str, params: &LoginParams<'_>, cookie
         return Err(Failure::Error(Error::from(response).await));
     }
 
-    // This is slightly weird. Successful login returns a JSON blob. Failed
-    // login returns JSON with an "error" key.
+    // Successful login returns a JSON blob.
+    // Failed login returns JSON with an "error" key.
     match response.json::<LoginResult>().await? {
         LoginResult::Failure(_) => Err(Failure::Unauthorized),
-        LoginResult::Success(r) => Ok(r.to_string())
+        LoginResult::Success(r) => Ok(r)
     }
 }
 
@@ -121,7 +126,7 @@ impl DiscourseAuth {
 
 #[async_trait]
 impl AuthProvider for DiscourseAuth {
-    async fn login(&self, username: &str, password: &str) -> Result<String, Failure> {
+    async fn login(&self, username: &str, password: &str) -> Result<Value, Failure> {
         let csrf = get_csrf(&self.client, &self.csrf_url).await?;
 
         let params = LoginParams {
@@ -276,7 +281,12 @@ mod test {
         assert_eq!(err.status, Some(418));
     }
 
-    async fn do_post_login(rt: ResponseTemplate, params: &LoginParams<'_>, cookies: &str) ->  Result<String, Failure> {
+    async fn do_post_login(
+        rt: ResponseTemplate,
+        params: &LoginParams<'_>,
+        cookies: &str
+    ) ->  Result<Value, Failure>
+    {
         let mock_server = setup_server("POST", LOGIN_ENDPOINT, rt).await;
         let client = Client::builder().build().unwrap();
         let url = mock_server.uri() + LOGIN_ENDPOINT;
@@ -292,13 +302,12 @@ mod test {
         };
 
         let json = json!({ "user": "stuff" });
-        let json_str = json.to_string();
 
         let rt = ResponseTemplate::new(200)
-            .set_body_json(json);
+            .set_body_json(json.clone());
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap();
-        assert_eq!(result, json_str);
+        assert_eq!(result, json);
     }
 
     #[tokio::test]
@@ -432,10 +441,9 @@ mod test {
             );
 
         let json = json!({ "user": "stuff" });
-        let json_str = json.to_string();
 
         let login_rt = ResponseTemplate::new(200)
-            .set_body_json(json);
+            .set_body_json(json.clone());
 
         let mock_server = MockServer::start().await;
 
@@ -456,7 +464,7 @@ mod test {
         let dauth = DiscourseAuth::new(&mock_server.uri());
 
         let result = dauth.login("skroob", "12345").await.unwrap();
-        assert_eq!(result, json_str);
+        assert_eq!(result, json);
     }
 
     #[tokio::test]

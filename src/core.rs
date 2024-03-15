@@ -1,4 +1,5 @@
 use axum::async_trait;
+use serde_json::Value;
 use std::sync::Arc;
 
 use crate::{
@@ -29,7 +30,7 @@ pub trait Core {
         _nonce_expected: &str,
         _sso: &str,
         _sig: &str
-    ) -> Result<(String, Option<String>), AppError> {
+    ) -> Result<(i64, String, Option<String>), AppError> {
         unimplemented!();
     }
 
@@ -37,14 +38,14 @@ pub trait Core {
         &self,
         _username: &str,
         _password: &str,
-    ) -> Result<(), AppError>
+    ) -> Result<Value, AppError>
     {
         unimplemented!();
     }
 
     fn issue_jwt(
         &self,
-        _username: &str
+        _uid: i64
     ) -> Result<Token, AppError>
     {
         unimplemented!();
