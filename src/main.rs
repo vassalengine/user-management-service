@@ -169,7 +169,7 @@ async fn main() {
         discourse_url: discourse_url.into(),
         discourse_shared_secret: discourse_shared_secret.into(),
         now: Utc::now,
-        auth: DiscourseAuth::new(&discourse_url),
+        auth: DiscourseAuth::new(discourse_url),
         issuer: JWTIssuer::new(jwt_key)
     };
 
