@@ -6,10 +6,13 @@ use axum::{
     routing::{get, post}
 };
 use chrono::Utc;
+use serde::Deserialize;
 use serde_json::json;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{
-    net::SocketAddr,
+    fs,
+    io,
+    net::{IpAddr, SocketAddr},
     sync::Arc,
     time::Duration
 };
@@ -144,40 +147,53 @@ fn routes(api: &str) -> Router<AppState> {
 
 // TODO: rate limiting
 
-#[tokio::main]
-async fn main() {
-    let listen_ip = [0, 0, 0, 0];
-    let listen_port = 4000;
-    
-    let db_path = "users.db";
-    let api_base_path = "/api/v1";
+#[derive(Debug, thiserror::Error)]
+enum StartupError {
+    #[error("{0}")]
+    AddrParseError(#[from] std::net::AddrParseError),
+    #[error("{0}")]
+    TomlParseError(#[from] toml::de::Error),
+    #[error("{0}")]
+    DatabaseError(#[from] sqlx::Error),
+    #[error("{0}")]
+    IOError(#[from] io::Error)
+}
 
-    let jwt_key = b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z";
-    let discourse_url = "https://forum.vassalengine.org";
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    pub db_path: String,
+    pub jwt_key: String,
+    pub api_base_path: String,
+    pub listen_ip: String,
+    pub listen_port: u16,
+    pub discourse_url: String,
     // See: discourse connect provider secrets *
-    let discourse_shared_secret = b"";
+    pub discourse_shared_secret: String
+}
 
-// TODO: handle error?
+#[tokio::main]
+async fn main() -> Result<(), StartupError> {
+    let config: Config = toml::from_str(&fs::read_to_string("config.toml")?)?;
+
     let db_pool = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(&format!("sqlite://{}", db_path))
-        .await
-        .unwrap();
+        .connect(&format!("sqlite://{}", &config.db_path))
+        .await?;
 
     let core = ProdCore {
         db: SqlxDatabaseClient(db_pool),
-        discourse_url: discourse_url.into(),
-        discourse_shared_secret: discourse_shared_secret.into(),
+        discourse_url: config.discourse_url.clone(),
+        discourse_shared_secret: config.discourse_shared_secret.into_bytes(),
         now: Utc::now,
-        auth: DiscourseAuth::new(discourse_url),
-        issuer: JWTIssuer::new(jwt_key)
+        auth: DiscourseAuth::new(&config.discourse_url),
+        issuer: JWTIssuer::new(config.jwt_key.as_bytes())
     };
 
     let state = AppState {
         core: Arc::new(core) as CoreArc
     };
 
-    let app = routes(api_base_path)
+    let app = routes(&config.api_base_path)
         .with_state(state)
         .layer(
             ServiceBuilder::new().layer(
@@ -192,13 +208,12 @@ async fn main() {
             .rate_limit(5, Duration::from_secs(1))
         );
 
-    let addr = SocketAddr::from((listen_ip, listen_port));
-    let listener = TcpListener::bind(addr)
-        .await
-        .unwrap();
-    serve(listener, app)
-        .await
-        .unwrap();
+    let ip: IpAddr = config.listen_ip.parse()?;
+    let addr = SocketAddr::from((ip, config.listen_port));
+    let listener = TcpListener::bind(addr).await?;
+    serve(listener, app).await?;
+
+    Ok(())
 }
 
 #[cfg(test)]
