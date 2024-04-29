@@ -17,7 +17,7 @@ impl DatabaseClient for SqlxDatabaseClient<Sqlite> {
     async fn get_user_avatar_template(
         &self,
         username: &str
-    ) -> Result<Option<String>, DatabaseError>
+    ) -> Result<String, DatabaseError>
     {
         get_user_avatar_template(&self.0, username).await
     }
@@ -43,7 +43,7 @@ impl DatabaseClient for SqlxDatabaseClient<Sqlite> {
 async fn get_user_avatar_template<'e, E>(
     ex: E,
     username: &str
-) -> Result<Option<String>, DatabaseError>
+) -> Result<String, DatabaseError>
 where
     E: Executor<'e, Database = Sqlite>
 {
@@ -56,14 +56,12 @@ WHERE username = ?
             ",
             username
         )
-        .fetch_optional(ex)
+        .fetch_one(ex)
         .await?
     )
 }
 
 // TODO: should probably use real user ids
-// TODO: can we get avatar updates from the discourse web hook?
-
 async fn update_user_avatar_template<'e, E>(
     ex: E,
     username: &str,

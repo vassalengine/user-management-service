@@ -1,7 +1,6 @@
 use thiserror::Error;
 
 use crate::{
-    avatar::RequestError,
     db::DatabaseError,
     jwt::JWTError,
     sso::SsoResponseError

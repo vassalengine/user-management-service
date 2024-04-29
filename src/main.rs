@@ -25,7 +25,6 @@ use tower::{
 use tower_http::cors::CorsLayer;
 
 mod app;
-mod avatar;
 mod auth_provider;
 mod core;
 mod db;

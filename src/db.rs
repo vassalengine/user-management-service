@@ -12,7 +12,7 @@ pub trait DatabaseClient {
     async fn get_user_avatar_template(
         &self,
         _username: &str
-    ) -> Result<Option<String>, DatabaseError>
+    ) -> Result<String, DatabaseError>
     {
         unimplemented!();
     }

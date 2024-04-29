@@ -3,7 +3,6 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use crate::{
-    avatar::get_avatar_template,
     auth_provider::AuthProvider,
     core::Core,
     db::DatabaseClient,
@@ -38,17 +37,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         size: u32
     ) -> Result<String, AppError> {
         // get the avatar template
-        let tmpl = match self.db.get_user_avatar_template(username).await? {
-            Some(tmpl) => tmpl,
-            None => {
-                let tmpl = get_avatar_template(
-                    &self.discourse_url,
-                    username
-                ).await?;
-                self.db.update_user_avatar_template(username, &tmpl).await?;
-                tmpl
-            }
-        };
+        let tmpl = self.db.get_user_avatar_template(username).await?;
 
         // make a URL from the template
         let avatar_url = format!(
