@@ -1,6 +1,8 @@
 use axum::async_trait;
 use thiserror::Error;
 
+use crate::model::UserUpdateParams;
+
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub struct DatabaseError(#[from] sqlx::Error);
@@ -19,6 +21,14 @@ pub trait DatabaseClient {
         &self,
         _username: &str,
         _avatar_template: &str
+    ) -> Result<(), DatabaseError>
+    {
+        unimplemented!();
+    }
+
+    async fn update_user(
+        &self,
+        _params: &UserUpdateParams
     ) -> Result<(), DatabaseError>
     {
         unimplemented!();

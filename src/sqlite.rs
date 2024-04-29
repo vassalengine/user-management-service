@@ -4,7 +4,10 @@ use sqlx::{
     sqlite::Sqlite
 };
 
-use crate::db::{DatabaseClient, DatabaseError};
+use crate::{
+    db::{DatabaseClient, DatabaseError},
+    model::UserUpdateParams
+};
 
 #[derive(Clone)]
 pub struct SqlxDatabaseClient<DB: Database>(pub sqlx::Pool<DB>);
@@ -26,6 +29,14 @@ impl DatabaseClient for SqlxDatabaseClient<Sqlite> {
     ) -> Result<(), DatabaseError>
     {
         update_user_avatar_template(&self.0, username, avatar_template).await
+    }
+
+    async fn update_user(
+        &self,
+        params: &UserUpdateParams
+    ) -> Result<(), DatabaseError>
+    {
+        update_user(&self.0, params).await
     }
 }
 
@@ -71,6 +82,32 @@ VALUES (?, ?)
         ",
         username,
         avatar_template
+    )
+    .execute(ex)
+    .await?;
+
+    Ok(())
+}
+
+async fn update_user<'e, E>(
+    ex: E,
+    params: &UserUpdateParams
+) -> Result<(), DatabaseError>
+where
+    E: Executor<'e, Database = Sqlite>
+{
+    sqlx::query!(
+        "
+INSERT OR REPLACE INTO users (
+    user_id,
+    username,
+    avatar_template
+)
+VALUES (?, ?, ?)
+        ",
+        params.id,
+        params.username,
+        params.avatar_template
     )
     .execute(ex)
     .await?;

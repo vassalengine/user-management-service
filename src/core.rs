@@ -4,11 +4,18 @@ use std::sync::Arc;
 
 use crate::{
     errors::AppError,
-    model::Token
+    model::{Token, UserUpdateParams}
 };
 
 #[async_trait]
 pub trait Core {
+    async fn update_user(
+        &self,
+        _params: &UserUpdateParams
+    ) -> Result<(), AppError> {
+        unimplemented!();
+    }
+
     async fn get_avatar_url(
         &self,
         _username: &str,

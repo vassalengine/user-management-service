@@ -23,6 +23,18 @@ pub struct SsoLogoutResponseParams {
     pub returnto: String
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UserUpdateParams {
+    pub id: u32,
+    pub username: String,
+    pub avatar_template: String
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UserUpdatePost {
+    pub user: UserUpdateParams
+}
+
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct Token {
     pub token: String

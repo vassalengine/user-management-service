@@ -112,6 +112,15 @@ pub async fn sso_complete_logout_get(
     )
 }
 
+pub async fn users_username_post(
+    Path(username): Path<String>,
+    State(state): State<AppState>,
+    Json(data): Json<UserUpdatePost>
+) -> Result<(), AppError>
+{
+    Ok(state.core.update_user(&data.user).await?)
+}
+
 pub async fn users_username_avatar_size_get(
     Path((username, size)): Path<(String, u32)>,
     State(state): State<AppState>

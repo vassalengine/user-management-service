@@ -10,7 +10,7 @@ use crate::{
     discourse::DiscourseAuth,
     errors::AppError,
     jwt::JWTIssuer,
-    model::Token,
+    model::{Token, UserUpdateParams},
     sso::{build_sso_request, verify_sso_response}
 };
 
@@ -25,6 +25,13 @@ pub struct ProdCore<C: DatabaseClient> {
 
 #[async_trait]
 impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
+    async fn update_user(
+        &self,
+        params: &UserUpdateParams
+    ) -> Result<(), AppError> {
+        Ok(self.db.update_user(params).await?)
+    }
+
     async fn get_avatar_url(
         &self,
         username: &str,
