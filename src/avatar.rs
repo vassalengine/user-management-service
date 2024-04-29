@@ -4,7 +4,8 @@ use reqwest::{
     header::ACCEPT
 };
 use serde::Deserialize;
-use thiserror::Error;
+
+use crate::errors::RequestError;
 
 #[derive(Deserialize)]
 struct User {
@@ -15,14 +16,6 @@ struct User {
 struct Reply {
     user: User
 }
-
-#[derive(Debug, Error)]
-pub enum RequestError {
-    #[error("request to Discourse failed: {0}")]
-    ClientError(#[from] reqwest::Error),
-    #[error("request to Discourse failed: {0}: {1} {2}")]
-    HttpError(String, u16, String)
-} 
 
 // TODO: special handling for 429
 
