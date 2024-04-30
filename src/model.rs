@@ -23,6 +23,7 @@ pub struct SsoLogoutResponseParams {
     pub returnto: String
 }
 
+// TODO: add default for limit
 #[derive(Debug, Deserialize)]
 pub struct UserSearchParams {
     pub term: String,

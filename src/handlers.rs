@@ -3,6 +3,7 @@ use axum::{
     response::{Json, Redirect}
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar};
+use serde_json::Value;
 
 use crate::{
     app::AppState,
@@ -113,7 +114,30 @@ pub async fn sso_complete_logout_get(
     )
 }
 
-pub async fn users_username_post(
+/*
+pub async fn users_get(
+    Query(params): Query<UserSearchParams>,
+    State(state): State<AppState>
+) -> Result<Redirect, AppError>
+{
+    Ok(
+        Redirect::to(
+            &state.core.get_user_search_url(&params.term, params.limit)?
+        )
+    )
+}
+*/
+
+// FIXME: temporary CORS workaround
+pub async fn users_get(
+    Query(params): Query<UserSearchParams>,
+    State(state): State<AppState>
+) -> Result<Json<Value>, AppError>
+{
+    Ok(Json(state.core.get_user_search(&params.term, params.limit).await?))
+}
+
+pub async fn users_username_get(
     Path(username): Path<String>,
     State(state): State<AppState>
 ) -> Result<Redirect, AppError>

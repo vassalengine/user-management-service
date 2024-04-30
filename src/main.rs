@@ -35,6 +35,7 @@ mod handlers;
 mod jwt;
 mod model;
 mod prod_core;
+mod search;
 mod signature;
 mod sqlite;
 mod sso;
@@ -135,6 +136,16 @@ fn routes(api: &str) -> Router<AppState> {
         .route(
             &format!("{api}/sso/logout"),
             get(handlers::sso_logout_get)
+        )
+// TODO: users tests
+        .route(
+            &format!("{api}/users"),
+            get(handlers::users_get)
+            .post(handlers::users_post)
+        )
+        .route(
+            &format!("{api}/users/:username"),
+            get(handlers::users_username_get)
         )
         .route(
             &format!("{api}/users/:username/avatar/:size"),

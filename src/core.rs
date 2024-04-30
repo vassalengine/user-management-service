@@ -9,6 +9,29 @@ use crate::{
 
 #[async_trait]
 pub trait Core {
+    async fn get_user_search(
+        &self,
+        _term: &str,
+        _limit: u32
+    ) -> Result<Value, AppError> {
+        unimplemented!();
+    }
+
+    fn get_user_search_url(
+        &self,
+        _term: &str,
+        _limit: u32
+    ) -> Result<String, AppError> {
+        unimplemented!();
+    }
+
+    fn get_user_url(
+        &self,
+        _username: &str
+    ) -> Result<String, AppError> {
+        unimplemented!();
+    }
+
     async fn update_user(
         &self,
         _params: &UserUpdateParams

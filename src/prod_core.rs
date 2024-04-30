@@ -25,6 +25,36 @@ pub struct ProdCore<C: DatabaseClient> {
 
 #[async_trait]
 impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
+    async fn get_user_search(
+        &self,
+        term: &str,
+        limit: u32
+    ) -> Result<Value, AppError> {
+        Ok(user_search(&self.discourse_url, term, limit).await?)
+    }
+
+    fn get_user_search_url(
+        &self,
+        term: &str,
+        limit: u32
+    ) -> Result<String, AppError> {
+        Ok(
+            format!(
+                "{}/u/search/users?term={}&include_groups=false&limit={}",
+                self.discourse_url,
+                term,
+                limit
+            )
+        )
+    }
+
+    fn get_user_url(
+        &self,
+        username: &str
+    ) -> Result<String, AppError> {
+        Ok(format!("{}/u/{username}", self.discourse_url))
+    }
+
     async fn update_user(
         &self,
         params: &UserUpdateParams
