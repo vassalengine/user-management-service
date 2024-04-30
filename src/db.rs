@@ -1,5 +1,4 @@
 use axum::async_trait;
-use thiserror::Error;
 
 use crate::{
     core::CoreError,
