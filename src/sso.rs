@@ -1,9 +1,9 @@
 use base64::{Engine as _};
-use hmac::{Hmac, Mac};
 use rand::distributions::{Alphanumeric, DistString};
-use sha2::Sha256;
 use std::collections::HashMap;
 use thiserror::Error;
+
+use crate::signature::{make_signature, verify_signature};
 
 pub fn build_sso_request(
     shared_secret: &[u8],
@@ -29,11 +29,7 @@ pub fn build_sso_request(
     let enc_payload = urlencoding::encode(&b64_payload);
 
     // compute the signature
-    let mut mac = Hmac::<Sha256>::new_from_slice(shared_secret)
-        .expect("HMAC can take key of any size");
-    mac.update(b64_payload.as_bytes());
-    let result = mac.finalize();
-    let code_bytes = result.into_bytes();
+    let code_bytes = make_signature(b64_payload.as_bytes(), shared_secret);
     let hex_signature = hex::encode(code_bytes);
 
     // create the url
@@ -74,11 +70,7 @@ pub fn verify_sso_response(
 ) -> Result<(i64, String, Option<String>), SsoResponseError>
 {
     // compute the digest and check the signature
-    let mut mac = Hmac::<Sha256>::new_from_slice(shared_secret)
-        .expect("HMAC can take key of any size");
-    mac.update(sso.as_bytes());
-    let code_bytes = hex::decode(sig)?;
-    mac.verify_slice(&code_bytes)?;
+    verify_signature(sso.as_bytes(), shared_secret, &hex::decode(sig)?)?;
 
     // base64 decode the query
     let b = base64::engine::general_purpose::STANDARD.decode(sso)?;

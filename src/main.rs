@@ -29,16 +29,18 @@ mod auth_provider;
 mod core;
 mod db;
 mod discourse;
+mod extractors;
 mod errors;
 mod handlers;
 mod jwt;
 mod model;
 mod prod_core;
+mod signature;
 mod sqlite;
 mod sso;
 
 use crate::{
-    app::AppState,
+    app::{AppState, DiscourseUpdateConfig},
     core::CoreArc,
     discourse::DiscourseAuth,
     errors::{AppError, HttpError},
@@ -167,7 +169,9 @@ pub struct Config {
     pub listen_port: u16,
     pub discourse_url: String,
     // See: discourse connect provider secrets *
-    pub discourse_shared_secret: String
+    pub discourse_sso_secret: String,
+    // See: discourse webhooks
+    pub discourse_update_secret: String
 }
 
 #[tokio::main]
@@ -182,14 +186,19 @@ async fn main() -> Result<(), StartupError> {
     let core = ProdCore {
         db: SqlxDatabaseClient(db_pool),
         discourse_url: config.discourse_url.clone(),
-        discourse_shared_secret: config.discourse_shared_secret.into_bytes(),
+        discourse_sso_secret: config.discourse_sso_secret.into_bytes(),
         now: Utc::now,
         auth: DiscourseAuth::new(&config.discourse_url),
         issuer: JWTIssuer::new(config.jwt_key.as_bytes())
     };
 
+    let duc = DiscourseUpdateConfig {
+        secret: config.discourse_update_secret.into_bytes()
+    };
+
     let state = AppState {
-        core: Arc::new(core) as CoreArc
+        core: Arc::new(core) as CoreArc,
+        discourse_update_config: Arc::new(duc)
     };
 
     let app = routes(&config.api_base_path)
@@ -235,7 +244,8 @@ mod test {
 
     use crate::{
         core::Core,
-        model::{LoginParams, Token}
+        model::{LoginParams, Token, UserUpdatePost, UserUpdateParams},
+        signature::make_signature
     };
 
     const API_V1: &str = "/api/v1";
@@ -268,7 +278,8 @@ mod test {
 
     fn test_state_no_auth() -> AppState {
         AppState {
-            core: Arc::new(NoAuthCore) as CoreArc
+            core: Arc::new(NoAuthCore) as CoreArc,
+            discourse_update_config: Default::default()
         }
     }
 
@@ -297,7 +308,8 @@ mod test {
 
     fn test_state_ok_auth() -> AppState {
         AppState {
-            core: Arc::new(OkAuthCore) as CoreArc
+            core: Arc::new(OkAuthCore) as CoreArc,
+            discourse_update_config: Default::default()
         }
     }
 
@@ -318,7 +330,8 @@ mod test {
 
     fn test_state_fail_auth() -> AppState {
         AppState {
-            core: Arc::new(FailAuthCore) as CoreArc
+            core: Arc::new(FailAuthCore) as CoreArc,
+            discourse_update_config: Default::default()
         }
     }
 
@@ -339,7 +352,8 @@ mod test {
 
     fn test_state_error_auth() -> AppState {
         AppState {
-            core: Arc::new(ErrorAuthCore) as CoreArc
+            core: Arc::new(ErrorAuthCore) as CoreArc,
+            discourse_update_config: Default::default()
         }
     }
 
@@ -567,5 +581,61 @@ mod test {
         .await;
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[derive(Clone)]
+    struct OkUpdateUser;
+
+    #[async_trait]
+    impl Core for OkUpdateUser {
+        async fn update_user(
+            &self,
+            _params: &UserUpdateParams
+        ) -> Result<(), AppError> {
+            Ok(())
+        }
+    }
+
+    fn test_state_ok_update_user() -> AppState {
+        AppState {
+            core: Arc::new(OkUpdateUser) as CoreArc,
+            discourse_update_config: Arc::new(
+                DiscourseUpdateConfig {
+                    secret: "12345".into()
+                }
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn users_post_ok() {
+        let b = serde_json::to_vec(
+            &UserUpdatePost {
+                user: UserUpdateParams {
+                    id: 3,
+                    username: "bob".into(),
+                    avatar_template: "".into()
+                }
+            }
+        ).unwrap();
+
+        let secret = "12345";
+        let sig = make_signature(&b, secret.as_bytes());
+        let hval = format!("sha256={}", hex::encode(sig));
+
+        let response = try_request(
+            test_state_ok_update_user(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/users"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .header("X-Discourse-Event-Signature", hval)
+                .body(Body::from(b))
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(body_empty(response).await);
     }
 }

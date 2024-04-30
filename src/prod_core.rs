@@ -10,13 +10,14 @@ use crate::{
     errors::AppError,
     jwt::JWTIssuer,
     model::{Token, UserUpdateParams},
+    search::user_search,
     sso::{build_sso_request, verify_sso_response}
 };
 
 pub struct ProdCore<C: DatabaseClient> {
     pub db: C,
     pub discourse_url: String,
-    pub discourse_shared_secret: Vec<u8>,
+    pub discourse_sso_secret: Vec<u8>,
     pub now: fn() -> DateTime<Utc>,
     pub auth: DiscourseAuth,
     pub issuer: JWTIssuer
@@ -55,7 +56,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         is_login: bool
     ) -> (String, String) {
         build_sso_request(
-            &self.discourse_shared_secret,
+            &self.discourse_sso_secret,
             &self.discourse_url,
             returnto,
             is_login
@@ -70,7 +71,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
     ) -> Result<(i64, String, Option<String>), AppError> {
         Ok(
             verify_sso_response(
-                &self.discourse_shared_secret,
+                &self.discourse_sso_secret,
                 nonce_expected,
                 sso,
                 sig

@@ -8,7 +8,8 @@ use crate::{
     app::AppState,
     core::CoreArc,
     errors::AppError,
-    model::{LoginParams, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, Token}
+    extractors::DiscourseEvent,
+    model::{LoginParams, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, Token, UserSearchParams, UserUpdatePost}
 };
 
 pub async fn root_get() -> &'static str {
@@ -114,8 +115,15 @@ pub async fn sso_complete_logout_get(
 
 pub async fn users_username_post(
     Path(username): Path<String>,
+    State(state): State<AppState>
+) -> Result<Redirect, AppError>
+{
+    Ok(Redirect::to(&state.core.get_user_url(&username)?))
+}
+
+pub async fn users_post(
     State(state): State<AppState>,
-    Json(data): Json<UserUpdatePost>
+    DiscourseEvent(data): DiscourseEvent<UserUpdatePost>
 ) -> Result<(), AppError>
 {
     Ok(state.core.update_user(&data.user).await?)
