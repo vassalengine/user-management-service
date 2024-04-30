@@ -7,7 +7,7 @@ use crate::{
     core::{Core, CoreError},
     db::DatabaseClient,
     discourse::DiscourseAuth,
-    errors::{AppError, RequestError},
+    errors::AppError,
     jwt::JWTIssuer,
     model::{Token, UserUpdateParams},
     search::user_search,

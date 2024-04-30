@@ -635,7 +635,7 @@ mod test {
     );
 
     fn update_msg_sig(secret: &str) -> String {
-        let sig = make_signature(&*UPDATE_MSG, secret.as_bytes());
+        let sig = make_signature(&UPDATE_MSG, secret.as_bytes());
         format!("sha256={}", hex::encode(sig))
     }
 
