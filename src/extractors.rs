@@ -1,6 +1,6 @@
 use axum::{
     async_trait,
-    body::{self, Body, Bytes},
+    body::{self, Bytes},
     extract::{FromRef, FromRequest, FromRequestParts, Json, Request, State},
     http::{
         header::HeaderValue,
@@ -49,7 +49,10 @@ where
         state: &S
     ) -> Result<Self, Self::Rejection>
     {
-        let sig = match req.headers().get("X-Discourse-Event-Signature") {
+        let (mut parts, body) = req.into_parts();
+
+        // get the signature from the header
+        let sig = match parts.headers.get("X-Discourse-Event-Signature") {
             Some(val) => match val.as_bytes().strip_prefix(b"sha256=") {
                 Some(hex) => hex::decode(hex)
                     .or(Err(AppError::Unauthorized)),
@@ -58,11 +61,10 @@ where
             None => Err(AppError::Unauthorized)
         }?;
 
-        let (mut parts, body) = req.into_parts();
-
+        // get the body and verify the signature
         let bytes = body::to_bytes(body, usize::MAX)
             .await
-            .or(Err(AppError::InternalError))?;
+            .or(Err(AppError::MalformedQuery))?;
 
         let duc: Arc<DiscourseUpdateConfig> = get_state(&mut parts, state)
             .await; 
@@ -70,9 +72,10 @@ where
         verify_signature(&bytes, &duc.secret, &sig)
             .or(Err(AppError::Unauthorized))?;
 
+        // it checks out, parse the JSON
         let Json(payload) = Json::<T>::from_bytes(&bytes)
-            .or(Err(AppError::InternalError))?;
+            .or(Err(AppError::MalformedQuery))?;
 
         Ok(DiscourseEvent(payload))
-    }    
+    }
 }

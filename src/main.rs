@@ -80,6 +80,9 @@ impl IntoResponse for AppError {
             AppError::InternalError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "TODO!".into())
             },
+            AppError::MalformedQuery => {
+                (StatusCode::BAD_REQUEST, "Bad request".into())
+            },
             AppError::DatabaseError(e) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             },
@@ -249,12 +252,13 @@ mod test {
     };
     use const_format::formatcp;
     use mime::{APPLICATION_JSON, TEXT_PLAIN};
+    use once_cell::sync::Lazy;
     use serde::Deserialize;
     use serde_json::{json, Value};
     use tower::ServiceExt; // for oneshot
 
     use crate::{
-        core::Core,
+        core::{Core, CoreError},
         model::{LoginParams, Token, UserUpdatePost, UserUpdateParams},
         signature::make_signature
     };
@@ -602,7 +606,7 @@ mod test {
         async fn update_user(
             &self,
             _params: &UserUpdateParams
-        ) -> Result<(), AppError> {
+        ) -> Result<(), CoreError> {
             Ok(())
         }
     }
@@ -618,9 +622,8 @@ mod test {
         }
     }
 
-    #[tokio::test]
-    async fn users_post_ok() {
-        let b = serde_json::to_vec(
+    static UPDATE_MSG: Lazy<Vec<u8>> = Lazy::new(||
+        serde_json::to_vec(
             &UserUpdatePost {
                 user: UserUpdateParams {
                     id: 3,
@@ -628,7 +631,148 @@ mod test {
                     avatar_template: "".into()
                 }
             }
-        ).unwrap();
+        ).unwrap()
+    );
+
+    fn update_msg_sig(secret: &str) -> String {
+        let sig = make_signature(&*UPDATE_MSG, secret.as_bytes());
+        format!("sha256={}", hex::encode(sig))
+    }
+
+    #[tokio::test]
+    async fn users_post_ok() {
+        let hval = update_msg_sig("12345");
+        let response = try_request(
+            test_state_ok_update_user(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/users"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .header("X-Discourse-Event-Signature", hval)
+                .body(Body::from(UPDATE_MSG.clone()))
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(body_empty(response).await);
+    }
+
+    #[tokio::test]
+    async fn users_post_no_signature_header() {
+        let response = try_request(
+            test_state_ok_update_user(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/users"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .body(Body::from(UPDATE_MSG.clone()))
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn users_post_bad_signature_header() {
+        let response = try_request(
+            test_state_ok_update_user(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/users"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .header("X-Discourse-Event-Signature", "bogus")
+                .body(Body::from(UPDATE_MSG.clone()))
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn users_post_bad_signature_header_prefix() {
+        let response = try_request(
+            test_state_ok_update_user(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/users"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .header("X-Discourse-Event-Signature", "sha257=ff")
+                .body(Body::from(UPDATE_MSG.clone()))
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn users_post_bad_signature_header_hash() {
+        let response = try_request(
+            test_state_ok_update_user(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/users"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .header("X-Discourse-Event-Signature", "sha256=bogus")
+                .body(Body::from(UPDATE_MSG.clone()))
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn users_post_signature_mismatch() {
+        let hval = update_msg_sig("54321");
+        let response = try_request(
+            test_state_ok_update_user(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/users"))
+                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                .header("X-Discourse-Event-Signature", hval)
+                .body(Body::from(UPDATE_MSG.clone()))
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+/*
+    #[tokio::test]
+    async fn users_post_no_mime_type() {
+        let secret = "12345";
+        let sig = make_signature(&*UPDATE_MSG, secret.as_bytes());
+        let hval = format!("sha256={}", hex::encode(sig));
+
+        let response = try_request(
+            test_state_ok_update_user(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/users"))
+                .header("X-Discourse-Event-Signature", hval)
+                .body(Body::from(UPDATE_MSG.clone()))
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn users_post_bad_mime_type() {
+
+    }
+*/
+
+    #[tokio::test]
+    async fn users_post_wrong_json() {
+        let b = serde_json::to_vec(r#"{ "garbage": "whatever" }"#).unwrap();
 
         let secret = "12345";
         let sig = make_signature(&b, secret.as_bytes());
@@ -646,7 +790,6 @@ mod test {
         )
         .await;
 
-        assert_eq!(response.status(), StatusCode::OK);
-        assert!(body_empty(response).await);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 }

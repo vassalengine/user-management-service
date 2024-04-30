@@ -4,10 +4,10 @@ use serde_json::Value;
 
 use crate::{
     auth_provider::AuthProvider,
-    core::Core,
+    core::{Core, CoreError},
     db::DatabaseClient,
     discourse::DiscourseAuth,
-    errors::AppError,
+    errors::{AppError, RequestError},
     jwt::JWTIssuer,
     model::{Token, UserUpdateParams},
     search::user_search,
@@ -29,7 +29,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         &self,
         term: &str,
         limit: u32
-    ) -> Result<Value, AppError> {
+    ) -> Result<Value, CoreError> {
         Ok(user_search(&self.discourse_url, term, limit).await?)
     }
 
@@ -37,7 +37,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         &self,
         term: &str,
         limit: u32
-    ) -> Result<String, AppError> {
+    ) -> Result<String, CoreError> {
         Ok(
             format!(
                 "{}/u/search/users?term={}&include_groups=false&limit={}",
@@ -51,14 +51,14 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
     fn get_user_url(
         &self,
         username: &str
-    ) -> Result<String, AppError> {
+    ) -> Result<String, CoreError> {
         Ok(format!("{}/u/{username}", self.discourse_url))
     }
 
     async fn update_user(
         &self,
         params: &UserUpdateParams
-    ) -> Result<(), AppError> {
+    ) -> Result<(), CoreError> {
         Ok(self.db.update_user(params).await?)
     }
 
@@ -66,7 +66,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         &self,
         username: &str,
         size: u32
-    ) -> Result<String, AppError> {
+    ) -> Result<String, CoreError> {
         // get the avatar template
         let tmpl = self.db.get_user_avatar_template(username).await?;
 

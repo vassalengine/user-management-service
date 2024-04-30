@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    db::DatabaseError,
+    core::CoreError,
     jwt::JWTError,
     sso::SsoResponseError
 };
@@ -13,13 +13,23 @@ pub struct HttpError {
 }
 
 #[derive(Debug, Error)]
+pub enum RequestError {
+    #[error("request to Discourse failed: {0}")]
+    ClientError(#[from] reqwest::Error),
+    #[error("request to Discourse failed: {0}: {1} {2}")]
+    HttpError(String, u16, String)
+}
+
+#[derive(Debug, Error)]
 pub enum AppError {
     #[error("Unauthorized")]
     Unauthorized,
     #[error("Internal error")]
     InternalError,
-    #[error("Database error")]
-    DatabaseError(#[from] DatabaseError),
+    #[error("Bad request")]
+    MalformedQuery,
+    #[error("{0}")]
+    DatabaseError(String),
     #[error("JWT error")]
     JTWError(#[from] JWTError),
     #[error("Server error")]
@@ -30,4 +40,13 @@ pub enum AppError {
     RequestError(#[from] RequestError),
     #[error("SSO failed")]
     SsoError(#[from] SsoResponseError)
+}
+
+impl From<CoreError> for AppError {
+    fn from(err: CoreError) -> Self {
+        match err {
+            CoreError::DatabaseError(e) => AppError::DatabaseError(e.to_string()),
+            CoreError::RequestError(e) => AppError::RequestError(e)
+        }
+    }
 }

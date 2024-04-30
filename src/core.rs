@@ -1,11 +1,31 @@
 use axum::async_trait;
 use serde_json::Value;
-use std::sync::Arc;
+use std::{
+    mem,
+    sync::Arc
+};
+use thiserror::Error;
 
 use crate::{
-    errors::AppError,
+    errors::{AppError, RequestError},
     model::{Token, UserUpdateParams}
 };
+
+#[derive(Debug, Error)]
+pub enum CoreError {
+    #[error("Database errror: {0}")]
+    DatabaseError(#[from] sqlx::Error),
+    #[error("Request error: {0}")]
+    RequestError(#[from] RequestError)
+}
+
+impl PartialEq for CoreError {
+    fn eq(&self, other: &Self) -> bool {
+        // sqlx::Error is not PartialEq, so we must exclude it
+        mem::discriminant(self) == mem::discriminant(other) &&
+        !matches!(self, CoreError::DatabaseError(_))
+    }
+}
 
 #[async_trait]
 pub trait Core {
@@ -13,7 +33,7 @@ pub trait Core {
         &self,
         _term: &str,
         _limit: u32
-    ) -> Result<Value, AppError> {
+    ) -> Result<Value, CoreError> {
         unimplemented!();
     }
 
@@ -21,21 +41,21 @@ pub trait Core {
         &self,
         _term: &str,
         _limit: u32
-    ) -> Result<String, AppError> {
+    ) -> Result<String, CoreError> {
         unimplemented!();
     }
 
     fn get_user_url(
         &self,
         _username: &str
-    ) -> Result<String, AppError> {
+    ) -> Result<String, CoreError> {
         unimplemented!();
     }
 
     async fn update_user(
         &self,
         _params: &UserUpdateParams
-    ) -> Result<(), AppError> {
+    ) -> Result<(), CoreError> {
         unimplemented!();
     }
 
@@ -43,7 +63,7 @@ pub trait Core {
         &self,
         _username: &str,
         _size: u32
-    ) -> Result<String, AppError> {
+    ) -> Result<String, CoreError> {
         unimplemented!();
     }
 

@@ -5,7 +5,8 @@ use sqlx::{
 };
 
 use crate::{
-    db::{DatabaseClient, DatabaseError},
+    core::CoreError,
+    db::DatabaseClient,
     model::UserUpdateParams
 };
 
@@ -17,24 +18,15 @@ impl DatabaseClient for SqlxDatabaseClient<Sqlite> {
     async fn get_user_avatar_template(
         &self,
         username: &str
-    ) -> Result<String, DatabaseError>
+    ) -> Result<String, CoreError>
     {
         get_user_avatar_template(&self.0, username).await
-    }
-
-    async fn update_user_avatar_template(
-        &self,
-        username: &str,
-        avatar_template: &str
-    ) -> Result<(), DatabaseError>
-    {
-        update_user_avatar_template(&self.0, username, avatar_template).await
     }
 
     async fn update_user(
         &self,
         params: &UserUpdateParams
-    ) -> Result<(), DatabaseError>
+    ) -> Result<(), CoreError>
     {
         update_user(&self.0, params).await
     }
@@ -43,7 +35,7 @@ impl DatabaseClient for SqlxDatabaseClient<Sqlite> {
 async fn get_user_avatar_template<'e, E>(
     ex: E,
     username: &str
-) -> Result<String, DatabaseError>
+) -> Result<String, CoreError>
 where
     E: Executor<'e, Database = Sqlite>
 {
@@ -61,36 +53,10 @@ WHERE username = ?
     )
 }
 
-// TODO: should probably use real user ids
-async fn update_user_avatar_template<'e, E>(
-    ex: E,
-    username: &str,
-    avatar_template: &str
-) -> Result<(), DatabaseError>
-where
-    E: Executor<'e, Database = Sqlite>
-{
-    sqlx::query!(
-        "
-INSERT OR REPLACE INTO users (
-    username,
-    avatar_template
-)
-VALUES (?, ?)
-        ",
-        username,
-        avatar_template
-    )
-    .execute(ex)
-    .await?;
-
-    Ok(())
-}
-
 async fn update_user<'e, E>(
     ex: E,
     params: &UserUpdateParams
-) -> Result<(), DatabaseError>
+) -> Result<(), CoreError>
 where
     E: Executor<'e, Database = Sqlite>
 {
