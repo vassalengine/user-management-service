@@ -2,8 +2,12 @@ use axum::{
     async_trait,
     body::{self, Bytes},
     extract::{FromRef, FromRequest, FromRequestParts, Json, Request, State},
-    http::request::Parts
+    http::{
+        header::CONTENT_TYPE,
+        request::Parts
+    }
 };
+use mime::{APPLICATION_JSON, Mime};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 // TODO: replace with into_ok() when that's available
@@ -47,6 +51,13 @@ where
     ) -> Result<Self, Self::Rejection>
     {
         let (mut parts, body) = req.into_parts();
+
+        // check that the Content-Type is application/json
+        parts.headers.get(CONTENT_TYPE)
+            .and_then(|hv| hv.to_str().ok()) 
+            .and_then(|ct| ct.parse::<Mime>().ok())
+            .filter(|mime| mime == &APPLICATION_JSON)
+            .ok_or(AppError::BadMimeType)?;
 
         // get the signature from the header
         let sig = match parts.headers.get("X-Discourse-Event-Signature") {

@@ -74,6 +74,9 @@ impl From<auth_provider::Failure> for AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
+            AppError::BadMimeType => {
+                (StatusCode::UNSUPPORTED_MEDIA_TYPE, "Unsupported media type".into())
+            },
             AppError::Unauthorized => {
                 (StatusCode::UNAUTHORIZED, "Unauthorized".into())
             },
@@ -743,13 +746,9 @@ mod test {
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
-/*
     #[tokio::test]
     async fn users_post_no_mime_type() {
-        let secret = "12345";
-        let sig = make_signature(&*UPDATE_MSG, secret.as_bytes());
-        let hval = format!("sha256={}", hex::encode(sig));
-
+        let hval = update_msg_sig("12345");
         let response = try_request(
             test_state_ok_update_user(),
             Request::builder()
@@ -761,14 +760,26 @@ mod test {
         )
         .await;
 
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
 
     #[tokio::test]
     async fn users_post_bad_mime_type() {
+        let hval = update_msg_sig("12345");
+        let response = try_request(
+            test_state_ok_update_user(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/users"))
+                .header(CONTENT_TYPE, TEXT_PLAIN.as_ref())
+                .header("X-Discourse-Event-Signature", hval)
+                .body(Body::from(UPDATE_MSG.clone()))
+                .unwrap()
+        )
+        .await;
 
+        assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
-*/
 
     #[tokio::test]
     async fn users_post_wrong_json() {

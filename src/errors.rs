@@ -22,6 +22,8 @@ pub enum RequestError {
 
 #[derive(Debug, Error)]
 pub enum AppError {
+    #[error("Unsupported media type")]
+    BadMimeType,
     #[error("Unauthorized")]
     Unauthorized,
     #[error("Internal error")]
