@@ -23,3 +23,30 @@ pub fn verify_signature(
     mac.update(bytes);
     mac.verify_slice(sig)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn signature_round_trip() {
+        let bytes = b"abcde";
+        let secret = b"12345";
+        let sig = make_signature(bytes, secret);
+        assert_eq!(verify_signature(bytes, secret, &sig).unwrap(), ());
+    }
+
+    #[test]
+    fn verify_signature_error() {
+        let bytes = b"abcde";
+        let secret = b"12345";
+        let sig = make_signature(bytes, secret);
+        assert!(
+            matches!(
+                // truncate the signature to ensure mismatch
+                verify_signature(bytes, secret, &sig[1..]).unwrap_err(),
+                MacError
+            )
+        );
+    }
+}
