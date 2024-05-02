@@ -5,8 +5,51 @@ use thiserror::Error;
 
 use crate::signature::{make_signature, verify_signature};
 
+fn encode_and_sign_payload(
+    payload: &str,
+    secret: &[u8]
+) -> (String, String) {
+    // base64- and urlencode the payload
+    let b64_payload = base64::engine::general_purpose::STANDARD.encode(payload);
+    let enc_payload = urlencoding::encode(&b64_payload);
+
+    // compute the signature
+    let sig_bytes = make_signature(b64_payload.as_bytes(), secret);
+    let sig_hex = hex::encode(sig_bytes);
+
+    (enc_payload.into_owned(), sig_hex)
+}
+
+
+pub fn build_sso_request_with_nonce(
+    secret: &[u8],
+    discourse_url: &str,
+    returnto: &str,
+    is_login: bool,
+    nonce: &str
+) -> String
+{
+    // create a payload with the nonce and the return URL
+    let payload = if is_login {
+        format!("nonce={nonce}&return_sso_url={returnto}")
+    }
+    else {
+        format!("nonce={nonce}&return_sso_url={returnto}&logout=true")
+    };
+
+    let (payload, sig) = encode_and_sign_payload(&payload, secret);
+
+    // create the url
+    format!(
+        "{}/session/sso_provider?sso={}&sig={}",
+        discourse_url,
+        payload,
+        sig
+    )
+}
+
 pub fn build_sso_request(
-    shared_secret: &[u8],
+    secret: &[u8],
     discourse_url: &str,
     returnto: &str,
     is_login: bool
@@ -16,28 +59,12 @@ pub fn build_sso_request(
     let mut rng = rand::thread_rng();
     let nonce = Alphanumeric.sample_string(&mut rng, 20);
 
-    // create a payload with the nonce and the return URL
-    let payload = if is_login {
-        format!("nonce={nonce}&return_sso_url={returnto}")
-    }
-    else {
-        format!("nonce={nonce}&return_sso_url={returnto}&logout=true")
-    };
-
-    // base64- and urlencode the payload
-    let b64_payload = base64::engine::general_purpose::STANDARD.encode(payload);
-    let enc_payload = urlencoding::encode(&b64_payload);
-
-    // compute the signature
-    let code_bytes = make_signature(b64_payload.as_bytes(), shared_secret);
-    let hex_signature = hex::encode(code_bytes);
-
-    // create the url
-    let url = format!(
-        "{}/session/sso_provider?sso={}&sig={}",
+    let url = build_sso_request_with_nonce(
+        secret,
         discourse_url,
-        enc_payload,
-        hex_signature
+        returnto,
+        is_login,
+        &nonce
     );
 
     (nonce, url)
@@ -45,6 +72,8 @@ pub fn build_sso_request(
 
 #[derive(Debug, Error)]
 pub enum SsoResponseError {
+    #[error("url decoding failed")]
+    URLDecoding(#[from] std::string::FromUtf8Error),
     #[error("base64 decoding failed")]
     Base64Decoding(#[from] base64::DecodeError),
     #[error("hex decoding failed")]
@@ -61,19 +90,21 @@ pub enum SsoResponseError {
     Verify(#[from] digest::MacError)
 }
 
-// TODO: test
 pub fn verify_sso_response(
-    shared_secret: &[u8],
+    secret: &[u8],
     nonce_expected: &str,
     sso: &str,
     sig: &str
 ) -> Result<(i64, String, Option<String>), SsoResponseError>
 {
+    // url-decode sso
+    let sso = urlencoding::decode(&sso)?;
+
     // compute the digest and check the signature
-    verify_signature(sso.as_bytes(), shared_secret, &hex::decode(sig)?)?;
+    verify_signature(sso.as_bytes(), secret, &hex::decode(sig)?)?;
 
     // base64 decode the query
-    let b = base64::engine::general_purpose::STANDARD.decode(sso)?;
+    let b = base64::engine::general_purpose::STANDARD.decode(sso.as_ref())?;
 
     // unpack the query
     let qargs = serde_urlencoded::from_bytes::<HashMap<String, String>>(&b)?;
@@ -95,4 +126,48 @@ pub fn verify_sso_response(
         .ok_or(SsoResponseError::MissingUserId)?;
 
     Ok((uid, username, name))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn build_sso_request_ok() {
+        let url = build_sso_request_with_nonce(
+            b"12345",
+            "https://example.com",
+            "back/to/here",
+            false,
+            "abcde"
+        );
+
+        assert_eq!(
+            url,
+            "https://example.com/session/sso_provider?sso=bm9uY2U9YWJjZGUmcmV0dXJuX3Nzb191cmw9YmFjay90by9oZXJlJmxvZ291dD10cnVl&sig=7ed822c6e2478a751c87ebed29af0be2ab5dbc776dd3e71eb78d1e2bf91cb2e8"
+        );
+    }
+
+    #[test]
+    fn verify_sso_response_ok() {
+        let secret = b"12345";
+        let nonce = "abcde";
+        let username = "bob";
+        let name = "Robert";
+        let external_id = 42;
+
+        let payload = format!("nonce={nonce}&username={username}&name={name}&external_id={external_id}");
+
+        let (sso, sig) = encode_and_sign_payload(&payload, secret);
+
+        assert_eq!(
+            verify_sso_response(
+                secret,
+                nonce,
+                &sso,
+                &sig
+            ).unwrap(),
+            (external_id, username.into(), Some(name.into()))
+        )
+    }
 }
