@@ -5,6 +5,8 @@ use thiserror::Error;
 
 use crate::signature::{make_signature, verify_signature};
 
+// Reference: https://meta.discourse.org/t/setup-discourseconnect-official-single-sign-on-for-discourse-sso/13045
+
 fn encode_and_sign_payload(
     payload: &str,
     secret: &[u8]
