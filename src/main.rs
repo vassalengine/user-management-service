@@ -6,7 +6,7 @@ use axum::{
     routing::{get, post}
 };
 use chrono::Utc;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{
@@ -44,76 +44,43 @@ use crate::{
     app::{AppState, DiscourseUpdateConfig},
     core::CoreArc,
     discourse::DiscourseAuth,
-    errors::{AppError, HttpError},
+    errors::AppError,
     jwt::JWTIssuer,
     prod_core::ProdCore,
     sqlite::SqlxDatabaseClient
 };
 
-impl From<auth_provider::Failure> for AppError {
-    fn from(e: auth_provider::Failure) -> Self {
-        match e {
-            auth_provider::Failure::Error(err) => {
-                // All auth provider errors are 500 for us; put the auth
-                // provider status into the message if there is one.
-                AppError::ServerError(HttpError {
-                    status: 500,
-                    message: match err.status {
-                        Some(s) => format!("{} {}", s, err.message),
-                        None => err.message
-                    }
-                })
-            },
-            auth_provider::Failure::Unauthorized => {
-                AppError::Unauthorized
-            }
+impl From<&AppError> for StatusCode {
+    fn from(err: &AppError) -> Self {
+        match err {
+            AppError::BadMimeType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            AppError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::MalformedQuery => StatusCode::BAD_REQUEST,
+            AppError::RequestError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::JTWError(_) => StatusCode::UNAUTHORIZED,
+            AppError::SsoError(_) => StatusCode::UNAUTHORIZED,
+            AppError::Unauthorized => StatusCode::UNAUTHORIZED
         }
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
+struct HttpError {
+    error: String
+}
+
+impl From<AppError> for HttpError {
+    fn from(err: AppError) -> Self {
+        HttpError { error: format!("{}", err) }
     }
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status, error_message) = match self {
-            AppError::BadMimeType => {
-                (StatusCode::UNSUPPORTED_MEDIA_TYPE, "Unsupported media type".into())
-            },
-            AppError::Unauthorized => {
-                (StatusCode::UNAUTHORIZED, "Unauthorized".into())
-            },
-            AppError::InternalError => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "TODO!".into())
-            },
-            AppError::MalformedQuery => {
-                (StatusCode::BAD_REQUEST, "Bad request".into())
-            },
-            AppError::DatabaseError(e) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-            },
-            AppError::JTWError(_) => {
-                (StatusCode::UNAUTHORIZED, "Unauthorized".into())
-            },
-            AppError::ServerError(e)
-            | AppError::ClientError(e) => {
-                match StatusCode::from_u16(e.status) {
-                    Ok(s) => (s, e.message),
-                    // should not happen
-                    Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, e.message)
-                }
-            },
-            AppError::RequestError(e) => {
-                eprintln!("{e}");
-                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-            },
-            AppError::SsoError(_) => {
-                (StatusCode::UNAUTHORIZED, "Unauthorized".into())
-            }
-        };
-
-        let body = Json(json!({
-            "error": error_message,
-        }));
-
-        (status, body).into_response()
+        let code = StatusCode::from(&self);
+        let body = Json(HttpError::from(self));
+        (code, body).into_response()
     }
 }
 

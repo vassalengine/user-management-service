@@ -1,16 +1,11 @@
 use thiserror::Error;
 
 use crate::{
+    auth_provider,
     core::CoreError,
     jwt::JWTError,
     sso::SsoResponseError
 };
-
-#[derive(Debug)]
-pub struct HttpError {
-    pub status: u16,
-    pub message: String
-}
 
 #[derive(Debug, Error)]
 pub enum RequestError {
@@ -20,6 +15,7 @@ pub enum RequestError {
     HttpError(String, u16, String)
 }
 
+// TODO: review messages
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error("Unsupported media type")]
@@ -34,10 +30,6 @@ pub enum AppError {
     DatabaseError(String),
     #[error("JWT error")]
     JTWError(#[from] JWTError),
-    #[error("Server error")]
-    ServerError(HttpError),
-    #[error("Client error")]
-    ClientError(HttpError),
     #[error("Request error")]
     RequestError(#[from] RequestError),
     #[error("SSO failed")]
@@ -49,6 +41,27 @@ impl From<CoreError> for AppError {
         match err {
             CoreError::DatabaseError(e) => AppError::DatabaseError(e.to_string()),
             CoreError::RequestError(e) => AppError::RequestError(e)
+        }
+    }
+}
+
+impl From<auth_provider::Failure> for AppError {
+    fn from(e: auth_provider::Failure) -> Self {
+        match e {
+            auth_provider::Failure::Error(err) => {
+                // All auth provider errors are 500 for us; put the auth
+                // provider status into the message if there is one.
+                AppError::RequestError(
+                    RequestError::HttpError(
+                        "".into(),
+                        err.status.unwrap_or(500),
+                        err.message
+                    )
+                )
+            },
+            auth_provider::Failure::Unauthorized => {
+                AppError::Unauthorized
+            }
         }
     }
 }
