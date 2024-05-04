@@ -216,14 +216,16 @@ mod test {
         body::{self, Body, Bytes},
         http::{
             Method, Request,
-            header::CONTENT_TYPE,
-        },
+            header::{CONTENT_TYPE, COOKIE, SET_COOKIE}
+        }
     };
+    use axum_extra::extract::cookie::Cookie;
     use const_format::formatcp;
     use mime::{APPLICATION_JSON, TEXT_PLAIN};
     use once_cell::sync::Lazy;
     use serde::Deserialize;
     use serde_json::{json, Value};
+    use time::OffsetDateTime;
     use tower::ServiceExt; // for oneshot
 
     use crate::{
@@ -763,6 +765,289 @@ mod test {
                 .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                 .header("X-Discourse-Event-Signature", hval)
                 .body(Body::from(b))
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    fn cookies(response: &Response) -> Vec<Cookie> {
+        let mut cookies = response.headers()
+            .get_all(SET_COOKIE)
+            .iter()
+            .map(|hv| Cookie::parse(hv.to_str().unwrap()).unwrap())
+            .collect::<Vec<_>>();
+
+        cookies.sort_by(|a, b| a.name().cmp(b.name()));
+        cookies
+    }
+
+    #[track_caller]
+    fn assert_cookie_expired(cookie: Cookie, name: &str) {
+        assert_eq!(cookie.name(), name);
+        assert_eq!(cookie.max_age(), Some(time::Duration::ZERO));
+        assert!(cookie.expires_datetime().unwrap() < OffsetDateTime::now_utc());
+    }
+
+    #[derive(Clone)]
+    struct OkSsoLogin;
+
+    #[async_trait]
+    impl Core for OkSsoLogin {
+        fn build_sso_request(
+            &self,
+            _returnto: &str,
+            _login: bool
+        ) -> (String, String) {
+            ("abcde".into(), "https://example.com".into())
+        }
+    }
+
+    fn test_state_ok_sso_login() -> AppState {
+        AppState {
+            core: Arc::new(OkSsoLogin) as CoreArc,
+            discourse_update_config: Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn sso_login_ok() {
+        let response = try_request(
+            test_state_ok_sso_login(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/login?returnto=here"))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(
+            cookies(&response),
+            [ Cookie::new("nonce", "abcde") ]
+        );
+    }
+
+    #[tokio::test]
+    async fn sso_login_missing_returnto() {
+        let response = try_request(
+            test_state_ok_sso_login(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/login"))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn sso_logout_ok() {
+        let response = try_request(
+            test_state_ok_sso_login(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/logout?returnto=here"))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+
+        assert_eq!(
+            cookies(&response),
+            [ Cookie::new("nonce", "abcde") ]
+        );
+    }
+
+    #[tokio::test]
+    async fn sso_logout_missing_returnto() {
+        let response = try_request(
+            test_state_ok_sso_login(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/logout"))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[derive(Clone)]
+    struct OkSsoCompleteLogin;
+
+    #[async_trait]
+    impl Core for OkSsoCompleteLogin {
+        fn verify_sso_response(
+            &self,
+            _nonce_expected: &str,
+            _sso: &str,
+            _sig: &str
+        ) -> Result<(i64, String, Option<String>), AppError> {
+            Ok((3, "bob".into(), Some("Bob".into())))
+        }
+
+        fn issue_jwt(
+            &self,
+            _uid: i64
+        ) -> Result<Token, AppError>
+        {
+            Ok(Token { token: "token!".into() })
+        }
+    }
+
+    fn test_state_ok_sso_complete_login() -> AppState {
+        AppState {
+            core: Arc::new(OkSsoCompleteLogin) as CoreArc,
+            discourse_update_config: Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn sso_complete_login_ok() {
+        let response = try_request(
+            test_state_ok_sso_complete_login(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/completeLogin?sso=&sig=&returnto=here"))
+                .header(COOKIE, "nonce=abcde")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+
+        let mut c = cookies(&response).into_iter();
+        assert_eq!(
+            c.next().unwrap(),
+            Cookie::build(("name", "Bob")).path("/")
+        );
+        assert_cookie_expired(c.next().unwrap(), "nonce");
+        assert_eq!(
+            c.next().unwrap(),
+            Cookie::build(("token", "token!")).path("/").secure(true)
+        );
+        assert_eq!(
+            c.next().unwrap(),
+            Cookie::build(("username", "bob")).path("/")
+        );
+        assert_eq!(c.next(), None);
+    }
+
+    #[tokio::test]
+    async fn sso_complete_login_missing_sso() {
+        let response = try_request(
+            test_state_ok_sso_complete_login(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/completeLogin?sig=&returnto="))
+                .header(COOKIE, "nonce=abcde")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn sso_complete_login_missing_sig() {
+        let response = try_request(
+            test_state_ok_sso_complete_login(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/completeLogin?sso=&returnto="))
+                .header(COOKIE, "nonce=abcde")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn sso_complete_login_missing_returnto() {
+        let response = try_request(
+            test_state_ok_sso_complete_login(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/completeLogin?sso=&sig="))
+                .header(COOKIE, "nonce=abcde")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn sso_complete_login_missing_nonce() {
+        let response = try_request(
+            test_state_ok_sso_complete_login(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/completeLogin?sso=&sig=&returnto="))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[derive(Clone)]
+    struct DummyCore;
+
+    #[async_trait]
+    impl Core for DummyCore {}
+
+    fn test_state_ok_sso_complete_logout() -> AppState {
+        AppState {
+            core: Arc::new(DummyCore) as CoreArc,
+            discourse_update_config: Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn sso_complete_logout_ok() {
+        let response = try_request(
+            test_state_ok_sso_complete_logout(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/completeLogout?returnto=here"))
+                .header(COOKIE, "nonce=abcde; name=Bob; username=bob")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+
+        let mut c = cookies(&response).into_iter();
+        assert_cookie_expired(c.next().unwrap(), "name");
+        assert_cookie_expired(c.next().unwrap(), "nonce");
+        assert_cookie_expired(c.next().unwrap(), "username");
+        assert_eq!(c.next(), None);
+    }
+
+    #[tokio::test]
+    async fn sso_complete_logout_missing_returnto() {
+        let response = try_request(
+            test_state_ok_sso_complete_logout(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/sso/completeLogout"))
+                .body(Body::empty())
                 .unwrap()
         )
         .await;
