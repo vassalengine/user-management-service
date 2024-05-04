@@ -7,7 +7,6 @@ use axum::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{
     fs,

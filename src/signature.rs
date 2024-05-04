@@ -33,7 +33,7 @@ mod test {
         let bytes = b"abcde";
         let secret = b"12345";
         let sig = make_signature(bytes, secret);
-        assert_eq!(verify_signature(bytes, secret, &sig).unwrap(), ());
+        verify_signature(bytes, secret, &sig).unwrap();
     }
 
     #[test]

@@ -99,7 +99,7 @@ pub fn verify_sso_response(
 ) -> Result<(i64, String, Option<String>), SsoResponseError>
 {
     // url-decode sso
-    let sso = urlencoding::decode(&sso)?;
+    let sso = urlencoding::decode(sso)?;
 
     // compute the digest and check the signature
     verify_signature(sso.as_bytes(), secret, &hex::decode(sig)?)?;
@@ -222,7 +222,7 @@ mod test {
         let secret = b"12345";
 
         let b64 = "xyz"; // odd length!
-        let enc = urlencoding::encode(&b64);
+        let enc = urlencoding::encode(b64);
 
         // compute the signature
         let sig_bytes = make_signature(b64.as_bytes(), secret);
@@ -240,7 +240,7 @@ mod test {
     fn verify_sso_response_nonce_mismatch_error() {
         let secret = b"12345";
         let payload = "nonce=edcba";
-        let (sso, sig) = encode_and_sign_payload(&payload, secret);
+        let (sso, sig) = encode_and_sign_payload(payload, secret);
 
         assert!(
             matches!(
