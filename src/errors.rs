@@ -4,7 +4,7 @@ use crate::{
     auth_provider,
     core::CoreError,
     jwt::JWTError,
-    sso::SsoResponseError
+    discourse::sso::SsoResponseError
 };
 
 #[derive(Debug, Error)]

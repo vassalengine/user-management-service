@@ -6,12 +6,14 @@ use crate::{
     auth_provider::AuthProvider,
     core::{Core, CoreError},
     db::DatabaseClient,
-    discourse::DiscourseAuth,
+    discourse::{
+        login::DiscourseAuth,
+        sso::{build_sso_request, verify_sso_response}
+    },
     errors::AppError,
     jwt::JWTIssuer,
     model::{Token, UserUpdateParams},
-    search::user_search,
-    sso::{build_sso_request, verify_sso_response}
+    search::user_search
 };
 
 pub struct ProdCore<C: DatabaseClient> {

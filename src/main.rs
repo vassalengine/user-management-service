@@ -37,12 +37,11 @@ mod prod_core;
 mod search;
 mod signature;
 mod sqlite;
-mod sso;
 
 use crate::{
     app::{AppState, DiscourseUpdateConfig},
     core::CoreArc,
-    discourse::DiscourseAuth,
+    discourse::login::DiscourseAuth,
     errors::AppError,
     jwt::JWTIssuer,
     prod_core::ProdCore,
