@@ -525,6 +525,7 @@ mod test {
 
     impl Resolve for NonResolver {
         fn resolve(&self, _name: Name) -> Resolving {
+            // Resolve nothing; everything is an error
             Box::pin(async {
                 Err(Box::new(io::Error::from(io::ErrorKind::Other))
                         as Box::<dyn std::error::Error + Send + Sync>)
