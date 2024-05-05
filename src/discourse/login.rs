@@ -144,7 +144,12 @@ mod test {
     use super::*;
 
     use const_format::concatcp;
+    use reqwest::dns::{Name, Resolve, Resolving};
     use serde_json::json;
+    use std::{
+        io,
+        time::Duration
+    };
     use wiremock::{MockServer, Mock, ResponseTemplate, matchers};
 
     async fn setup_server(method: &str, endpoint: &str, rt: ResponseTemplate) -> MockServer {
@@ -510,9 +515,27 @@ mod test {
         assert!(matches!(result, Failure::Unauthorized));
     }
 
+    struct NonResolver;
+
+    impl Resolve for NonResolver {
+        fn resolve(&self, _name: Name) -> Resolving {
+            Box::pin(async {
+                Err(Box::new(io::Error::from(io::ErrorKind::Other))
+                        as Box::<dyn std::error::Error + Send + Sync>)
+            })
+        }
+    }
+
     #[tokio::test]
-    async fn discourse_auth_failed_to_connect() {
-        let dauth = DiscourseAuth::new("http://bogus");
+    async fn discourse_auth_dns_failure() {
+        let dauth = DiscourseAuth {
+            client: Client::builder()
+                .dns_resolver(std::sync::Arc::new(NonResolver))
+                .build()
+                .unwrap(),
+            csrf_url: "http://localhost".into(),
+            login_url: "".into(),
+        };
 
         let result = dauth.login("skroob", "12345").await.unwrap_err();
         assert!(matches!(result, Failure::Error(_)));
@@ -521,46 +544,25 @@ mod test {
         assert!(!err.message.is_empty());
     }
 
-/*
-    macro_rules! aw {
-      ($e:expr) => {
-          tokio_test::block_on($e)
-      };
-    }
-
-     #[test]
-    fn get_csrf_xxx() {
-        let client = Client::builder()
-//            .cookie_store(true)
-            .build()
-            .unwrap();
-
-        let url = "https://forum.vassalengine.org/session/csrf.json";
-
-        let csrf = aw!(get_csrf(&client, url)).unwrap();
-        assert_eq!(csrf.0, "");
-    }
-
-    #[test]
-    fn login_xxx() {
-        let client = Client::builder()
-            .build()
-            .unwrap();
-
-        let csrf_url = "https://forum.vassalengine.org/session/csrf.json";
-        let csrf = aw!(get_csrf(&client, csrf_url)).unwrap();
-
-        let login_url = "https://forum.vassalengine.org/session.json";
-        let login_params = LoginParams {
-//            login: "skroob",
-//            password: "12345",
-            authenticity_token: &csrf.0
-//            authenticity_token: ""
+    #[tokio::test]
+    async fn discourse_auth_failed_to_connect() {
+        // Timeout immediately to simulate connection failure
+        let dauth = DiscourseAuth {
+            client: Client::builder()
+                .timeout(Duration::from_nanos(1))
+                .build()
+                .unwrap(),
+            csrf_url: "http://localhost".into(),
+            login_url: "".into(),
         };
 
-        let result = aw!(post_login(&client, login_url, &login_params, &csrf.1)).unwrap();
-//        let result = aw!(post_login(&client, login_url, &login_params, "")).unwrap();
-        assert_eq!(result, "");
+        let result = dauth.login("skroob", "12345").await.unwrap_err();
+        assert!(matches!(result, Failure::Error(_)));
+        let Failure::Error(err) = result else { unreachable!() };
+        assert_eq!(err.status, None);
+        assert!(!err.message.is_empty());
     }
-*/
+
+// TODO: lost connection? timeout? no response?
+
 }
