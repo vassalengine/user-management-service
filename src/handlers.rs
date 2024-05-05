@@ -82,8 +82,6 @@ pub async fn sso_complete_login_get(
         &params.sig
     )?;
 
-    // TODO: issue JWT and return it with the cookies
-
     let token = core.issue_jwt(uid)?;
 
     let jar = if let Some(name) = name {
