@@ -2382,6 +2382,7 @@ dependencies = [
  "digest",
  "hex",
  "hmac",
+ "itertools",
  "jsonwebtoken",
  "mime",
  "once_cell",

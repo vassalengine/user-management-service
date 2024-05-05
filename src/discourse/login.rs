@@ -1,4 +1,5 @@
 use axum::async_trait;
+use itertools::Itertools;
 use mime::APPLICATION_JSON;
 use reqwest::{
     Client, StatusCode,
@@ -48,7 +49,6 @@ async fn get_csrf(client: &Client, url: &str) -> Result<(String, String), Failur
     // collect the returned cookies
     let cookies = response.cookies()
         .map(|c| format!("{}={}", c.name(), c.value()))
-        .collect::<Vec<String>>()
         .join("; ");
 
     // return the token and the cookies
