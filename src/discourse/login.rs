@@ -7,6 +7,7 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::time::Duration;
 
 use crate::auth_provider::{AuthProvider, Error, Failure};
 
@@ -117,7 +118,10 @@ const LOGIN_ENDPOINT: &str = "/session.json";
 impl DiscourseAuth {
     pub fn new(url: &str) -> DiscourseAuth {
         DiscourseAuth {
-            client: Client::builder().build().unwrap(),
+            client: Client::builder()
+                .timeout(Duration::from_secs(30))
+                .build()
+                .unwrap(),
             csrf_url: url.to_string() + CSRF_ENDPOINT,
             login_url: url.to_string() + LOGIN_ENDPOINT,
         }
@@ -146,10 +150,7 @@ mod test {
     use const_format::concatcp;
     use reqwest::dns::{Name, Resolve, Resolving};
     use serde_json::json;
-    use std::{
-        io,
-        time::Duration
-    };
+    use std::io;
     use wiremock::{MockServer, Mock, ResponseTemplate, matchers};
 
     async fn setup_server(method: &str, endpoint: &str, rt: ResponseTemplate) -> MockServer {
@@ -562,7 +563,4 @@ mod test {
         assert_eq!(err.status, None);
         assert!(!err.message.is_empty());
     }
-
-// TODO: lost connection? timeout? no response?
-
 }
