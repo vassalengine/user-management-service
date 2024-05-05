@@ -153,7 +153,12 @@ mod test {
     use std::io;
     use wiremock::{MockServer, Mock, ResponseTemplate, matchers};
 
-    async fn setup_server(method: &str, endpoint: &str, rt: ResponseTemplate) -> MockServer {
+    async fn setup_server(
+        method: &str,
+        endpoint: &str,
+        rt: ResponseTemplate
+    ) -> MockServer
+    {
         let mock_server = MockServer::start().await;
 
         Mock::given(matchers::method(method))
