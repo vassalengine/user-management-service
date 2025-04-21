@@ -210,8 +210,8 @@ async fn main() -> Result<(), StartupError> {
 mod test {
     use super::*;
 
+    use async_trait::async_trait;
     use axum::{
-        async_trait,
         body::{self, Body, Bytes},
         http::{
             Method, Request,

@@ -1,4 +1,4 @@
-use axum::async_trait;
+use async_trait::async_trait;
 use itertools::Itertools;
 use mime::APPLICATION_JSON;
 use reqwest::{
