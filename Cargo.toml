@@ -32,7 +32,7 @@ thiserror = "^1"
 tokio = { version = "^1", features = ["full"] }
 toml = "^0.8"
 tower-http = { version = "^0.5", features = ["cors"] }
-tower = { version = "^0.4", features = ["buffer", "limit"] }
+tower = { version = "^0.4", features = ["buffer", "limit", "util"] }
 unwrap-infallible = "^0.1"
 urlencoding = "^2"
 
