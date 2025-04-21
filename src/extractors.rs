@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use axum::{
     body::{self, Bytes},
     extract::{FromRef, FromRequest, FromRequestParts, Json, Request, State},
@@ -35,7 +34,6 @@ where
 
 pub struct DiscourseEvent<E>(pub E);
 
-#[async_trait]
 impl<S, T> FromRequest<S> for DiscourseEvent<T>
 where
     S: Send + Sync,

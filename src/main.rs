@@ -115,11 +115,11 @@ fn routes(api: &str) -> Router<AppState> {
             .post(handlers::users_post)
         )
         .route(
-            &format!("{api}/users/:username"),
+            &format!("{api}/users/{{username}}"),
             get(handlers::users_username_get)
         )
         .route(
-            &format!("{api}/users/:username/avatar/:size"),
+            &format!("{api}/users/{{username}}/avatar/{{size}}"),
             get(handlers::users_username_avatar_size_get)
         )
         .layer(

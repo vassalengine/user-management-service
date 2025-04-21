@@ -10,8 +10,8 @@ edition = "2021"
 
 [dependencies]
 async-trait = "^0.1"
-axum-extra = { version = "^0.9", features = ["cookie"] }
-axum = { version = "^0.7", features = ["http1", "http2", "json", "macros", "query", "tokio"] }
+axum-extra = { version = "^0.10", features = ["cookie"] }
+axum = { version = "^0.8", features = ["http1", "http2", "json", "macros", "query", "tokio"] }
 base64 = "^0.22"
 chrono = "^0.4"
 const_format = "^0.2"
