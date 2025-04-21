@@ -1,5 +1,5 @@
 use base64::{Engine as _};
-use rand::distributions::{Alphanumeric, DistString};
+use rand::distr::{Alphanumeric, SampleString};
 use std::collections::HashMap;
 use thiserror::Error;
 
