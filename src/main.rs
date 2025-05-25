@@ -182,11 +182,11 @@ fn routes(api: &str) -> Router<AppState> {
 #[derive(Debug, thiserror::Error)]
 enum StartupError {
     #[error("{0}")]
-    AddrParseError(#[from] std::net::AddrParseError),
+    AddrParse(#[from] std::net::AddrParseError),
     #[error("{0}")]
-    TomlParseError(#[from] toml::de::Error),
+    TomlParse(#[from] toml::de::Error),
     #[error("{0}")]
-    DatabaseError(#[from] sqlx::Error),
+    Database(#[from] sqlx::Error),
     #[error("{0}")]
     IOError(#[from] io::Error)
 }
