@@ -57,7 +57,7 @@ pub fn build_sso_request(
 ) -> (String, String)
 {
     // generate a nonce
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let nonce = Alphanumeric.sample_string(&mut rng, 20);
 
     let url = build_sso_request_with_nonce(
