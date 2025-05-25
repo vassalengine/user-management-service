@@ -27,7 +27,13 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::{DefaultOnFailure, DefaultOnResponse, TraceLayer}
 };
-use tracing::{info, info_span, Level, Span};
+use tracing::{error, info, info_span, Level, Span};
+use tracing_panic::panic_hook;
+use tracing_subscriber::{
+    EnvFilter,
+    layer::SubscriberExt,
+    util::SubscriberInitExt
+};
 
 mod app;
 mod auth_provider;
@@ -219,8 +225,7 @@ pub struct Config {
     pub discourse_update_secret: String
 }
 
-#[tokio::main]
-async fn main() -> Result<(), StartupError> {
+async fn run() -> Result<(), StartupError> {
     info!("Reading config.toml");
     let config: Config = toml::from_str(&fs::read_to_string("config.toml")?)?;
 
@@ -276,6 +281,39 @@ async fn main() -> Result<(), StartupError> {
     .await?;
 
     Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+    // set up logging
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| {
+                [
+                    // log this crate at info level
+                    &format!("{}=info", env!("CARGO_CRATE_NAME")),
+                    // tower_http is noisy below info
+                    "tower_http=info",
+                    // axum::rejection=trace shows rejections from extractors
+                    "axum::rejection=trace",
+                    // every panic is a fatal error
+                    "tracing_panic=error"
+                ].join(",").into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer().with_target(false))
+        .init();
+
+    // ensure that panics are logged
+    std::panic::set_hook(Box::new(panic_hook));
+
+    info!("Starting");
+
+    if let Err(e) = run().await {
+        error!("{}", e);
+    }
+
+    info!("Exiting");
 }
 
 #[cfg(test)]
