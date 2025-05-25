@@ -1,6 +1,5 @@
 use axum::{
-    BoxError, Router, serve,
-    error_handling::HandleErrorLayer,
+    Router, serve,
     extract::{ConnectInfo, Request},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
@@ -17,11 +16,7 @@ use std::{
     time::Duration
 };
 use tokio::net::TcpListener;
-use tower::{
-    ServiceBuilder,
-    buffer::BufferLayer,
-    limit::RateLimitLayer
-};
+use tower::ServiceBuilder;
 use tower_http::{
     cors::CorsLayer,
     timeout::TimeoutLayer,
@@ -254,19 +249,7 @@ async fn run() -> Result<(), StartupError> {
     };
 
     let app = routes(&config.api_base_path)
-        .with_state(state)
-        .layer(
-            ServiceBuilder::new().layer(
-                HandleErrorLayer::new(|err: BoxError| async move {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Unhandled error: {}", err)
-                    )
-                })
-            )
-            .buffer(1024)
-            .rate_limit(5, Duration::from_secs(1))
-        );
+        .with_state(state);
 
     let ip: IpAddr = config.listen_ip.parse()?;
     let addr = SocketAddr::from((ip, config.listen_port));
