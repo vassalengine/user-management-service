@@ -1,6 +1,7 @@
 use axum::{
     BoxError, Router, serve,
     error_handling::HandleErrorLayer,
+    extract::{ConnectInfo, Request},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
     routing::{get, post}
@@ -21,7 +22,12 @@ use tower::{
     buffer::BufferLayer,
     limit::RateLimitLayer
 };
-use tower_http::cors::CorsLayer;
+use tower_http::{
+    cors::CorsLayer,
+    timeout::TimeoutLayer,
+    trace::{DefaultOnFailure, DefaultOnResponse, TraceLayer}
+};
+use tracing::{info, info_span, Level, Span};
 
 mod app;
 mod auth_provider;
@@ -82,6 +88,31 @@ impl IntoResponse for AppError {
     }
 }
 
+fn real_addr(request: &Request) -> String {
+    // If we're behind a proxy, get IP from X-Forwarded-For header
+    match request.headers().get("x-forwarded-for") {
+        Some(addr) => addr.to_str()
+            .map(String::from)
+            .ok(),
+        None => request.extensions()
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|info| info.ip().to_string())
+    }
+    .unwrap_or_else(|| "<unknown>".into())
+}
+
+fn make_span(request: &Request) -> Span {
+    // adapted from tower_http::trace::DefaultMakeSpan
+    info_span!(
+        "request",
+        source = %real_addr(request),
+        method = %request.method(),
+        uri = %request.uri(),
+        version = ?request.version(),
+        headers = ?request.headers()
+    )
+}
+
 fn routes(api: &str) -> Router<AppState> {
     Router::new()
         .route(
@@ -125,6 +156,18 @@ fn routes(api: &str) -> Router<AppState> {
         .layer(
             ServiceBuilder::new()
                 .layer(CorsLayer::very_permissive())
+                // ensure requests don't block shutdown
+                .layer(TimeoutLayer::new(Duration::from_secs(10)))
+        )
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(make_span)
+                .on_response(
+                    DefaultOnResponse::new().level(Level::INFO)
+                )
+                .on_failure(
+                    DefaultOnFailure::new().level(Level::WARN)
+                )
         )
 }
 
@@ -140,6 +183,26 @@ enum StartupError {
     DatabaseError(#[from] sqlx::Error),
     #[error("{0}")]
     IOError(#[from] io::Error)
+}
+
+async fn shutdown_signal() {
+    use tokio::signal::unix::{signal, SignalKind};
+
+    let mut interrupt = signal(SignalKind::interrupt())
+        .expect("failed to install signal handler");
+
+    // Docker sends SIGQUIT for some unfathomable reason
+    let mut quit = signal(SignalKind::quit())
+        .expect("failed to install signal handler");
+
+    let mut terminate = signal(SignalKind::terminate())
+        .expect("failed to install signal handler");
+
+    tokio::select! {
+        _ = interrupt.recv() => info!("received SIGINT"),
+        _ = quit.recv() => info!("received SIGQUIT"),
+        _ = terminate.recv() => info!("received SIGTERM")
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -158,8 +221,10 @@ pub struct Config {
 
 #[tokio::main]
 async fn main() -> Result<(), StartupError> {
+    info!("Reading config.toml");
     let config: Config = toml::from_str(&fs::read_to_string("config.toml")?)?;
 
+    info!("Opening database {}", config.db_path);
     let db_pool = SqlitePoolOptions::new()
         .max_connections(5)
         .connect(&format!("sqlite://{}", &config.db_path))
@@ -201,7 +266,14 @@ async fn main() -> Result<(), StartupError> {
     let ip: IpAddr = config.listen_ip.parse()?;
     let addr = SocketAddr::from((ip, config.listen_port));
     let listener = TcpListener::bind(addr).await?;
-    serve(listener, app).await?;
+    info!("Listening on {}", addr);
+
+    serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>()
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
 
     Ok(())
 }
