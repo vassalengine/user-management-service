@@ -286,7 +286,7 @@ async fn main() {
                     // every panic is a fatal error
                     "tracing_panic=error"
                 ].join(",").into()
-            }),
+            })
         )
         .with(tracing_subscriber::fmt::layer()
             .with_target(false)
