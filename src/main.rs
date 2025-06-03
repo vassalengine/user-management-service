@@ -1,5 +1,6 @@
 use axum::{
     Router, serve,
+    body::Body,
     extract::{ConnectInfo, Request},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
@@ -20,7 +21,7 @@ use tower::ServiceBuilder;
 use tower_http::{
     cors::CorsLayer,
     timeout::TimeoutLayer,
-    trace::{DefaultOnFailure, DefaultOnResponse, TraceLayer}
+    trace::{DefaultOnFailure, DefaultOnResponse, MakeSpan, TraceLayer}
 };
 use tracing::{error, info, info_span, Level, Span};
 use tracing_panic::panic_hook;
@@ -102,19 +103,47 @@ fn real_addr(request: &Request) -> String {
     .unwrap_or_else(|| "<unknown>".into())
 }
 
-fn make_span(request: &Request) -> Span {
-    // adapted from tower_http::trace::DefaultMakeSpan
-    info_span!(
-        "request",
-        source = %real_addr(request),
-        method = %request.method(),
-        uri = %request.uri(),
-        version = ?request.version(),
-        headers = ?request.headers()
-    )
+#[derive(Clone, Debug)]
+struct SpanMaker {
+    include_headers: bool
 }
 
-fn routes(api: &str) -> Router<AppState> {
+impl SpanMaker {
+    pub fn new() -> Self {
+        Self { include_headers: false }
+    }
+
+    pub fn include_headers(mut self, include_headers: bool) -> Self {
+        self.include_headers = include_headers;
+        self
+    }
+}
+
+impl MakeSpan<Body> for SpanMaker {
+    fn make_span(&mut self, request: &Request<Body>) -> Span {
+        if self.include_headers {
+            info_span!(
+                "request",
+                source = %real_addr(request),
+                method = %request.method(),
+                uri = %request.uri(),
+                version = ?request.version(),
+                headers = ?request.headers()
+            )
+        }
+        else {
+            info_span!(
+                "request",
+                source = %real_addr(request),
+                method = %request.method(),
+                uri = %request.uri(),
+                version = ?request.version()
+            )
+        }
+    }
+}
+
+fn routes(api: &str, log_headers: bool) -> Router<AppState> {
     Router::new()
         .route(
             &format!("{api}/"),
@@ -162,13 +191,9 @@ fn routes(api: &str) -> Router<AppState> {
         )
         .layer(
             TraceLayer::new_for_http()
-                .make_span_with(make_span)
-                .on_response(
-                    DefaultOnResponse::new().level(Level::INFO)
-                )
-                .on_failure(
-                    DefaultOnFailure::new().level(Level::WARN)
-                )
+                .make_span_with(SpanMaker::new().include_headers(log_headers))
+                .on_response(DefaultOnResponse::new().level(Level::INFO))
+                .on_failure(DefaultOnFailure::new().level(Level::WARN))
         )
 }
 
@@ -217,7 +242,8 @@ pub struct Config {
     // See: discourse connect provider secrets *
     pub discourse_sso_secret: String,
     // See: discourse webhooks
-    pub discourse_update_secret: String
+    pub discourse_update_secret: String,
+    pub log_headers: bool
 }
 
 async fn run() -> Result<(), StartupError> {
@@ -248,8 +274,10 @@ async fn run() -> Result<(), StartupError> {
         discourse_update_config: Arc::new(duc)
     };
 
-    let app = routes(&config.api_base_path)
-        .with_state(state);
+    let app = routes(
+        &config.api_base_path,
+        config.log_headers
+    ).with_state(state);
 
     let ip: IpAddr = config.listen_ip.parse()?;
     let addr = SocketAddr::from((ip, config.listen_port));
@@ -348,7 +376,7 @@ mod test {
     }
 
     async fn try_request(state: AppState, request: Request<Body>) -> Response {
-        routes(API_V1)
+        routes(API_V1, false)
             .with_state(state)
             .oneshot(request)
             .await
