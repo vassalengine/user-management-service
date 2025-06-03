@@ -1,0 +1,9 @@
+db_path = "users.db"
+jwt_key = ""
+api_base_path = "/api/v1"
+listen_ip = "0.0.0.0"
+listen_port = 4000
+discourse_url = "https://forum.vassalengine.org"
+discourse_sso_secret = ""
+discourse_update_secret = ""
+log_headers = false
