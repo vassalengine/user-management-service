@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, Query, State},
     response::{Json, Redirect}
 };
-use axum_extra::extract::cookie::{Cookie, CookieJar};
+use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use serde_json::Value;
 
 use crate::{
@@ -100,15 +100,28 @@ pub async fn sso_complete_login_get(
     let refresh_token = core.issue_refresh(uid)?;
 
     let jar = if let Some(name) = name {
-        jar.add(Cookie::build(("name", name)).path("/"))
+        jar.add(Cookie::build(("name", name))
+            .path("/").same_site(SameSite::Lax)
+        )
     }
     else {
         jar
     }
     .remove(Cookie::from("nonce"))
-    .add(Cookie::build(("username", username)).path("/"))
-    .add(Cookie::build(("token", access_token)).path("/").secure(true))
-    .add(Cookie::build(("refresh", refresh_token)).path("/").secure(true));
+    .add(Cookie::build(("username", username))
+        .path("/")
+        .same_site(SameSite::Lax)
+    )
+    .add(Cookie::build(("token", access_token))
+        .path("/")
+        .secure(true)
+        .same_site(SameSite::Lax)
+    )
+    .add(Cookie::build(("refresh", refresh_token))
+        .path("/")
+        .secure(true)
+        .same_site(SameSite::Lax)
+    );
 
     Ok((jar, Redirect::to(&params.returnto)))
 }
