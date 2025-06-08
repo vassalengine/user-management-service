@@ -11,8 +11,8 @@ use crate::{
         sso::{build_sso_request, verify_sso_response}
     },
     errors::AppError,
-    jwt::JWTIssuer,
-    model::{Token, UserUpdateParams},
+    jwt::{self, EncodingKey},
+    model::UserUpdateParams,
     search::user_search
 };
 
@@ -22,7 +22,8 @@ pub struct ProdCore<C: DatabaseClient> {
     pub discourse_sso_secret: Vec<u8>,
     pub now: fn() -> DateTime<Utc>,
     pub auth: DiscourseAuth,
-    pub issuer: JWTIssuer
+    pub access_key: EncodingKey,
+    pub refresh_key: EncodingKey
 }
 
 #[async_trait]
@@ -120,20 +121,35 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         Ok(self.auth.login(username, password).await?)
     }
 
-    fn issue_jwt(
+    fn issue_access(
         &self,
         uid: i64
-    ) -> Result<Token, AppError>
+    ) -> Result<String, AppError>
     {
-        Ok(
-            Token {
-                token: self.issuer.issue(
-                    uid,
-                    (self.now)().timestamp(),
-                    8 * 60 * 60
-                )?
-            }
-        )
+        Ok(jwt::issue(
+            &self.access_key,
+            uid,
+            (self.now)().timestamp()
+                .try_into()
+                .or(Err(AppError::InternalError))?,
+            8 * 60 * 60
+        )?)
+    }
+
+    fn issue_refresh(
+        &self,
+        uid: i64
+    ) -> Result<String, AppError>
+    {
+        Ok(jwt::issue(
+            &self.refresh_key,
+            uid,
+            (self.now)().timestamp()
+                .try_into()
+                .or(Err(AppError::InternalError))?,
+            // TODO: read validity length from config
+            8 * 60 * 60
+        )?)
     }
 }
 

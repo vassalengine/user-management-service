@@ -51,7 +51,7 @@ use crate::{
     core::CoreArc,
     discourse::login::DiscourseAuth,
     errors::AppError,
-    jwt::JWTIssuer,
+    jwt::{DecodingKey, EncodingKey},
     prod_core::ProdCore,
     sqlite::SqlxDatabaseClient
 };
@@ -154,6 +154,10 @@ fn routes(api: &str, log_headers: bool) -> Router<AppState> {
             post(handlers::login_post)
         )
         .route(
+            &format!("{api}/refresh"),
+            post(handlers::refresh_post)
+        )
+        .route(
             &format!("{api}/sso/completeLogin"),
             get(handlers::sso_complete_login_get)
         )
@@ -234,7 +238,8 @@ async fn shutdown_signal() {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub db_path: String,
-    pub jwt_key: String,
+    pub access_key: String,
+    pub refresh_key: String,
     pub api_base_path: String,
     pub listen_ip: String,
     pub listen_port: u16,
@@ -262,7 +267,8 @@ async fn run() -> Result<(), StartupError> {
         discourse_sso_secret: config.discourse_sso_secret.into_bytes(),
         now: Utc::now,
         auth: DiscourseAuth::new(&config.discourse_url),
-        issuer: JWTIssuer::new(config.jwt_key.as_bytes())
+        access_key: EncodingKey::from_secret(config.access_key.as_bytes()),
+        refresh_key: EncodingKey::from_secret(config.refresh_key.as_bytes())
     };
 
     let duc = DiscourseUpdateConfig {
@@ -271,7 +277,8 @@ async fn run() -> Result<(), StartupError> {
 
     let state = AppState {
         core: Arc::new(core) as CoreArc,
-        discourse_update_config: Arc::new(duc)
+        discourse_update_config: Arc::new(duc),
+        refresh_key: DecodingKey::from_secret(config.refresh_key.as_bytes())
     };
 
     let app = routes(
@@ -343,7 +350,7 @@ mod test {
         body::{self, Body, Bytes},
         http::{
             Method, Request,
-            header::{CONTENT_TYPE, COOKIE, SET_COOKIE}
+            header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, SET_COOKIE}
         }
     };
     use axum_extra::extract::cookie::Cookie;
@@ -357,11 +364,15 @@ mod test {
 
     use crate::{
         core::{Core, CoreError},
-        model::{LoginParams, Token, UserUpdatePost, UserUpdateParams},
+        model::{LoginParams, LoginResponse, RefreshResponse, UserUpdatePost, UserUpdateParams},
         signature::make_signature
     };
 
     const API_V1: &str = "/api/v1";
+
+    const REFRESH_KEY: &[u8] = b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z";
+
+    const BOB_UID: i64 = 1;
 
     async fn body_bytes(r: Response) -> Bytes {
         body::to_bytes(r.into_body(), usize::MAX).await.unwrap()
@@ -373,6 +384,12 @@ mod test {
 
     async fn body_empty(r: Response) -> bool {
         body_bytes(r).await.is_empty()
+    }
+
+    fn token(uid: i64, key: &[u8]) -> String {
+        let ekey = EncodingKey::from_secret(key);
+        let token = jwt::issue(&ekey, uid, 0, 899999999999).unwrap();
+        format!("Bearer {token}")
     }
 
     async fn try_request(state: AppState, request: Request<Body>) -> Response {
@@ -392,7 +409,8 @@ mod test {
     fn test_state_no_auth() -> AppState {
         AppState {
             core: Arc::new(NoAuthCore) as CoreArc,
-            discourse_update_config: Default::default()
+            discourse_update_config: Default::default(),
+            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
         }
     }
 
@@ -410,19 +428,28 @@ mod test {
             Ok(json!({ "user": { "id": 42 } }))
         }
 
-        fn issue_jwt(
+        fn issue_access(
             &self,
             _uid: i64,
-        ) -> Result<Token, AppError>
+        ) -> Result<String, AppError>
         {
-            Ok(Token { token: "woohoo".into() })
+            Ok("woohoo".into())
+        }
+
+        fn issue_refresh(
+            &self,
+            _uid: i64,
+        ) -> Result<String, AppError>
+        {
+            Ok("so refreshing".into())
         }
     }
 
     fn test_state_ok_auth() -> AppState {
         AppState {
             core: Arc::new(OkAuthCore) as CoreArc,
-            discourse_update_config: Default::default()
+            discourse_update_config: Default::default(),
+            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
         }
     }
 
@@ -444,7 +471,8 @@ mod test {
     fn test_state_fail_auth() -> AppState {
         AppState {
             core: Arc::new(FailAuthCore) as CoreArc,
-            discourse_update_config: Default::default()
+            discourse_update_config: Default::default(),
+            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
         }
     }
 
@@ -461,12 +489,21 @@ mod test {
         {
             Err(AppError::InternalError)
         }
+
+        fn issue_refresh(
+            &self,
+            _uid: i64,
+        ) -> Result<String, AppError>
+        {
+            Err(AppError::InternalError)
+        }
     }
 
     fn test_state_error_auth() -> AppState {
         AppState {
             core: Arc::new(ErrorAuthCore) as CoreArc,
-            discourse_update_config: Default::default()
+            discourse_update_config: Default::default(),
+            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
         }
     }
 
@@ -509,8 +546,11 @@ mod test {
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
-            body_as::<Token>(response).await,
-            Token { token: "woohoo".into() }
+            body_as::<LoginResponse>(response).await,
+            LoginResponse {
+                access: "woohoo".into(),
+                refresh: "so refreshing".into()
+            }
         );
     }
 
@@ -696,6 +736,78 @@ mod test {
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 
+    #[tokio::test]
+    async fn refresh_ok() {
+        let response = try_request(
+            test_state_ok_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(&format!("{API_V1}/refresh"))
+                .header(AUTHORIZATION, token(BOB_UID, REFRESH_KEY))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            body_as::<RefreshResponse>(response).await,
+            RefreshResponse {
+                token: "woohoo".into()
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn refresh_wrong_method() {
+        let response = try_request(
+            test_state_no_auth(),
+            Request::builder()
+                .method(Method::GET)
+                .uri(formatcp!("{API_V1}/refresh"))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[tokio::test]
+    async fn refresh_failed_no_token() {
+        let response = try_request(
+            test_state_fail_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/refresh"))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn refresh_failed_bad_token() {
+        let response = try_request(
+            test_state_fail_auth(),
+            Request::builder()
+                .method(Method::POST)
+                .uri(formatcp!("{API_V1}/refresh"))
+                .header(AUTHORIZATION, "bogus")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn refresh_error() {
+    }
+
     #[derive(Clone)]
     struct OkUpdateUser;
 
@@ -716,7 +828,8 @@ mod test {
                 DiscourseUpdateConfig {
                     secret: "12345".into()
                 }
-            )
+            ),
+            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
         }
     }
 
@@ -934,7 +1047,8 @@ mod test {
     fn test_state_ok_sso_login() -> AppState {
         AppState {
             core: Arc::new(OkSsoLogin) as CoreArc,
-            discourse_update_config: Default::default()
+            discourse_update_config: Default::default(),
+            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
         }
     }
 
@@ -1021,19 +1135,28 @@ mod test {
             Ok((3, "bob".into(), Some("Bob".into())))
         }
 
-        fn issue_jwt(
+        fn issue_access(
             &self,
             _uid: i64
-        ) -> Result<Token, AppError>
+        ) -> Result<String, AppError>
         {
-            Ok(Token { token: "token!".into() })
+            Ok("token!".into())
+        }
+
+        fn issue_refresh(
+            &self,
+            _uid: i64
+        ) -> Result<String, AppError>
+        {
+            Ok("refresh!".into())
         }
     }
 
     fn test_state_ok_sso_complete_login() -> AppState {
         AppState {
             core: Arc::new(OkSsoCompleteLogin) as CoreArc,
-            discourse_update_config: Default::default()
+            discourse_update_config: Default::default(),
+            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
         }
     }
 
@@ -1053,11 +1176,16 @@ mod test {
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
 
         let mut c = cookies(&response).into_iter();
+        // cookies iterate in alphabetical order by name
         assert_eq!(
             c.next().unwrap(),
             Cookie::build(("name", "Bob")).path("/")
         );
         assert_cookie_expired(c.next().unwrap(), "nonce");
+        assert_eq!(
+            c.next().unwrap(),
+            Cookie::build(("refresh", "refresh!")).path("/").secure(true)
+        );
         assert_eq!(
             c.next().unwrap(),
             Cookie::build(("token", "token!")).path("/").secure(true)
@@ -1141,7 +1269,8 @@ mod test {
     fn test_state_ok_sso_complete_logout() -> AppState {
         AppState {
             core: Arc::new(DummyCore) as CoreArc,
-            discourse_update_config: Default::default()
+            discourse_update_config: Default::default(),
+            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
         }
     }
 

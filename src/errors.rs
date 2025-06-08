@@ -3,8 +3,8 @@ use thiserror::Error;
 use crate::{
     auth_provider,
     core::CoreError,
-    jwt::JWTError,
-    discourse::sso::SsoResponseError
+    discourse::sso::SsoResponseError,
+    jwt
 };
 
 #[derive(Debug, Error)]
@@ -29,7 +29,7 @@ pub enum AppError {
     #[error("{0}")]
     DatabaseError(String),
     #[error("JWT error")]
-    JTWError(#[from] JWTError),
+    JTWError(#[from] jwt::Error),
     #[error("Request error")]
     RequestError(#[from] RequestError),
     #[error("SSO failed")]

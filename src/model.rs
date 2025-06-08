@@ -6,6 +6,17 @@ pub struct LoginParams {
     pub password: String
 }
 
+#[derive(Debug, Deserialize, Eq, Serialize, PartialEq)]
+pub struct LoginResponse {
+    pub access: String,
+    pub refresh: String
+}
+
+#[derive(Debug, Deserialize, Eq, Serialize, PartialEq)]
+pub struct RefreshResponse {
+    pub token: String
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SsoLoginParams {
     pub returnto: String
@@ -40,9 +51,4 @@ pub struct UserUpdateParams {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct UserUpdatePost {
     pub user: UserUpdateParams
-}
-
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
-pub struct Token {
-    pub token: String
 }

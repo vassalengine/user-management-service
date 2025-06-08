@@ -6,11 +6,11 @@ use axum_extra::extract::cookie::{Cookie, CookieJar};
 use serde_json::Value;
 
 use crate::{
-    app::AppState,
     core::CoreArc,
     errors::AppError,
     extractors::DiscourseEvent,
-    model::{LoginParams, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, Token, UserSearchParams, UserUpdatePost}
+    jwt::Claims,
+    model::{LoginParams, LoginResponse, RefreshResponse, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, UserSearchParams, UserUpdatePost}
 };
 
 pub async fn root_get() -> &'static str {
@@ -20,13 +20,27 @@ pub async fn root_get() -> &'static str {
 pub async fn login_post(
     State(core): State<CoreArc>,
     Json(params): Json<LoginParams>
-) -> Result<Json<Token>, AppError>
+) -> Result<Json<LoginResponse>, AppError>
 {
     let resp = core.login(&params.username, &params.password).await?;
     let uid = resp.pointer("/user/id")
         .and_then(Value::as_i64)
         .ok_or(AppError::InternalError)?;
-    Ok(Json(core.issue_jwt(uid)?))
+
+    Ok(Json(LoginResponse {
+        access: core.issue_access(uid)?,
+        refresh: core.issue_refresh(uid)?
+    }))
+}
+
+pub async fn refresh_post(
+    claims: Claims,
+    State(core): State<CoreArc>
+) -> Result<Json<RefreshResponse>, AppError>
+{
+    Ok(Json(RefreshResponse {
+        token: core.issue_access(claims.sub)?
+    }))
 }
 
 fn start_sso_request(
@@ -82,7 +96,8 @@ pub async fn sso_complete_login_get(
         &params.sig
     )?;
 
-    let token = core.issue_jwt(uid)?;
+    let access_token = core.issue_access(uid)?;
+    let refresh_token = core.issue_refresh(uid)?;
 
     let jar = if let Some(name) = name {
         jar.add(Cookie::build(("name", name)).path("/"))
@@ -92,7 +107,8 @@ pub async fn sso_complete_login_get(
     }
     .remove(Cookie::from("nonce"))
     .add(Cookie::build(("username", username)).path("/"))
-    .add(Cookie::build(("token", token.token)).path("/").secure(true));
+    .add(Cookie::build(("token", access_token)).path("/").secure(true))
+    .add(Cookie::build(("refresh", refresh_token)).path("/").secure(true));
 
     Ok((jar, Redirect::to(&params.returnto)))
 }

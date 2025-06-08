@@ -8,7 +8,7 @@ use thiserror::Error;
 
 use crate::{
     errors::{AppError, RequestError},
-    model::{Token, UserUpdateParams}
+    model::UserUpdateParams
 };
 
 #[derive(Debug, Error)]
@@ -93,10 +93,18 @@ pub trait Core {
         unimplemented!();
     }
 
-    fn issue_jwt(
+    fn issue_access(
         &self,
         _uid: i64
-    ) -> Result<Token, AppError>
+    ) -> Result<String, AppError>
+    {
+        unimplemented!();
+    }
+
+    fn issue_refresh(
+        &self,
+        _uid: i64
+    ) -> Result<String, AppError>
     {
         unimplemented!();
     }

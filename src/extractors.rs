@@ -1,9 +1,17 @@
 use axum::{
+    RequestPartsExt,
     body::{self, Bytes},
     extract::{FromRef, FromRequest, FromRequestParts, Json, Request, State},
     http::{
         header::CONTENT_TYPE,
         request::Parts
+    }
+};
+use axum_extra::{
+    TypedHeader,
+    headers::{
+        Authorization,
+        authorization::Bearer
     }
 };
 use mime::{APPLICATION_JSON, Mime};
@@ -15,6 +23,7 @@ use unwrap_infallible::UnwrapInfallible;
 use crate::{
     app::DiscourseUpdateConfig,
     errors::AppError,
+    jwt::{self, Claims, DecodingKey},
     signature::verify_signature
 };
 
@@ -30,6 +39,33 @@ where
         .await
         .unwrap_infallible()
         .0
+}
+
+impl<S> FromRequestParts<S> for Claims
+where
+    S: Send + Sync,
+    DecodingKey: FromRef<S>
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &S
+    ) -> Result<Self, Self::Rejection>
+    {
+        // get the bearer token from the Authorization header
+        let TypedHeader(Authorization(bearer)) = parts
+            .extract::<TypedHeader::<Authorization<Bearer>>>()
+            .await
+            .or(Err(AppError::Unauthorized))?;
+
+        // verify the token
+        let key = DecodingKey::from_ref(state);
+        let claims = jwt::verify(bearer.token(), &key)
+            .or(Err(AppError::Unauthorized))?;
+
+        Ok(claims)
+    }
 }
 
 pub struct DiscourseEvent<E>(pub E);
