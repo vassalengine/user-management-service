@@ -239,7 +239,9 @@ async fn shutdown_signal() {
 pub struct Config {
     pub db_path: String,
     pub access_key: String,
+    pub access_key_ttl: u64,
     pub refresh_key: String,
+    pub refresh_key_ttl: u64,
     pub api_base_path: String,
     pub listen_ip: String,
     pub listen_port: u16,
@@ -268,7 +270,9 @@ async fn run() -> Result<(), StartupError> {
         now: Utc::now,
         auth: DiscourseAuth::new(&config.discourse_url),
         access_key: EncodingKey::from_secret(config.access_key.as_bytes()),
-        refresh_key: EncodingKey::from_secret(config.refresh_key.as_bytes())
+        access_key_ttl: config.access_key_ttl,
+        refresh_key: EncodingKey::from_secret(config.refresh_key.as_bytes()),
+        refresh_key_ttl: config.refresh_key_ttl
     };
 
     let duc = DiscourseUpdateConfig {

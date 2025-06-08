@@ -1,5 +1,8 @@
 db_path = "users.db"
-jwt_key = ""
+access_key = ""
+access_key_ttl = 28800
+refresh_key = ""
+refresh_key_ttl = 28800
 api_base_path = "/api/v1"
 listen_ip = "0.0.0.0"
 listen_port = 4000

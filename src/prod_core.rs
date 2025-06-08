@@ -23,7 +23,9 @@ pub struct ProdCore<C: DatabaseClient> {
     pub now: fn() -> DateTime<Utc>,
     pub auth: DiscourseAuth,
     pub access_key: EncodingKey,
-    pub refresh_key: EncodingKey
+    pub access_key_ttl: u64,
+    pub refresh_key: EncodingKey,
+    pub refresh_key_ttl: u64
 }
 
 #[async_trait]
@@ -132,7 +134,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
             (self.now)().timestamp()
                 .try_into()
                 .or(Err(AppError::InternalError))?,
-            8 * 60 * 60
+            self.access_key_ttl
         )?)
     }
 
@@ -147,8 +149,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
             (self.now)().timestamp()
                 .try_into()
                 .or(Err(AppError::InternalError))?,
-            // TODO: read validity length from config
-            8 * 60 * 60
+            self.refresh_key_ttl
         )?)
     }
 }
