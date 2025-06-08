@@ -3,6 +3,7 @@ use axum::{
     response::{Json, Redirect}
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
+use time::Duration;
 use serde_json::Value;
 
 use crate::{
@@ -116,6 +117,8 @@ pub async fn sso_complete_login_get(
         .path("/")
         .secure(true)
         .same_site(SameSite::Lax)
+// FIXME: temporary
+        .max_age(Duration::minutes(1))
     )
     .add(Cookie::build(("refresh", refresh_token))
         .path("/")

@@ -363,7 +363,7 @@ mod test {
     use once_cell::sync::Lazy;
     use serde::Deserialize;
     use serde_json::{json, Value};
-    use time::OffsetDateTime;
+    use time::{Duration, OffsetDateTime};
     use tower::ServiceExt; // for oneshot
 
     use crate::{
@@ -1192,7 +1192,7 @@ mod test {
         );
         assert_eq!(
             c.next().unwrap(),
-            Cookie::build(("token", "token!")).path("/").secure(true)
+            Cookie::build(("token", "token!")).path("/").secure(true).max_age(Duration::minutes(1))
         );
         assert_eq!(
             c.next().unwrap(),
