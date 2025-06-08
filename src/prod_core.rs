@@ -128,13 +128,14 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         uid: i64
     ) -> Result<String, AppError>
     {
+        let now = (self.now)().timestamp()
+            .try_into()
+            .or(Err(AppError::InternalError))?;
         Ok(jwt::issue(
             &self.access_key,
             uid,
-            (self.now)().timestamp()
-                .try_into()
-                .or(Err(AppError::InternalError))?,
-            self.access_key_ttl
+            now,
+            now + self.access_key_ttl
         )?)
     }
 
@@ -143,13 +144,14 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         uid: i64
     ) -> Result<String, AppError>
     {
+        let now = (self.now)().timestamp()
+            .try_into()
+            .or(Err(AppError::InternalError))?;
         Ok(jwt::issue(
             &self.refresh_key,
             uid,
-            (self.now)().timestamp()
-                .try_into()
-                .or(Err(AppError::InternalError))?,
-            self.refresh_key_ttl
+            now,
+            now + self.refresh_key_ttl
         )?)
     }
 }
