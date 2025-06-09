@@ -155,11 +155,11 @@ pub async fn sso_complete_logout_get(
     Ok(
         (
             jar
-                .remove(Cookie::from("name"))
-                .remove(Cookie::from("nonce"))
-                .remove(Cookie::from("token"))
-                .remove(Cookie::from("refresh"))
-                .remove(Cookie::from("username")),
+                .remove(Cookie::build("name").path("/"))
+                .remove(Cookie::build("nonce"))
+                .remove(Cookie::build("token").path("/"))
+                .remove(Cookie::build("refresh").path("/"))
+                .remove(Cookie::build("username").path("/")),
             Redirect::to(&params.returnto)
         )
     )
