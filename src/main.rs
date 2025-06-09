@@ -51,7 +51,7 @@ use crate::{
     core::CoreArc,
     discourse::login::DiscourseAuth,
     errors::AppError,
-    jwt::{DecodingKey, EncodingKey},
+    jwt::EncodingKey,
     prod_core::ProdCore,
     sqlite::SqlxDatabaseClient
 };
@@ -239,9 +239,8 @@ async fn shutdown_signal() {
 pub struct Config {
     pub db_path: String,
     pub access_key: String,
-    pub access_key_ttl: u64,
-    pub refresh_key: String,
-    pub refresh_key_ttl: u64,
+    pub access_key_ttl: i64,
+    pub refresh_ttl: i64,
     pub api_base_path: String,
     pub listen_ip: String,
     pub listen_port: u16,
@@ -271,8 +270,7 @@ async fn run() -> Result<(), StartupError> {
         auth: DiscourseAuth::new(&config.discourse_url),
         access_key: EncodingKey::from_secret(config.access_key.as_bytes()),
         access_key_ttl: config.access_key_ttl,
-        refresh_key: EncodingKey::from_secret(config.refresh_key.as_bytes()),
-        refresh_key_ttl: config.refresh_key_ttl
+        refresh_ttl: config.refresh_ttl
     };
 
     let duc = DiscourseUpdateConfig {
@@ -281,8 +279,7 @@ async fn run() -> Result<(), StartupError> {
 
     let state = AppState {
         core: Arc::new(core) as CoreArc,
-        discourse_update_config: Arc::new(duc),
-        refresh_key: DecodingKey::from_secret(config.refresh_key.as_bytes())
+        discourse_update_config: Arc::new(duc)
     };
 
     let app = routes(
@@ -357,13 +354,13 @@ mod test {
             header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, SET_COOKIE}
         }
     };
-    use axum_extra::extract::cookie::Cookie;
+    use axum_extra::extract::cookie::{Cookie, SameSite};
     use const_format::formatcp;
     use mime::{APPLICATION_JSON, TEXT_PLAIN};
     use once_cell::sync::Lazy;
     use serde::Deserialize;
     use serde_json::{json, Value};
-    use time::{Duration, OffsetDateTime};
+    use time::OffsetDateTime;
     use tower::ServiceExt; // for oneshot
 
     use crate::{
@@ -376,8 +373,6 @@ mod test {
 
     const REFRESH_KEY: &[u8] = b"@wlD+3L)EHdv28u)OFWx@83_*TxhVf9IdUncaAz6ICbM~)j+dH=sR2^LXp(tW31z";
 
-    const BOB_UID: i64 = 1;
-
     async fn body_bytes(r: Response) -> Bytes {
         body::to_bytes(r.into_body(), usize::MAX).await.unwrap()
     }
@@ -388,12 +383,6 @@ mod test {
 
     async fn body_empty(r: Response) -> bool {
         body_bytes(r).await.is_empty()
-    }
-
-    fn token(uid: i64, key: &[u8]) -> String {
-        let ekey = EncodingKey::from_secret(key);
-        let token = jwt::issue(&ekey, uid, 0, 899999999999).unwrap();
-        format!("Bearer {token}")
     }
 
     async fn try_request(state: AppState, request: Request<Body>) -> Response {
@@ -413,8 +402,7 @@ mod test {
     fn test_state_no_auth() -> AppState {
         AppState {
             core: Arc::new(NoAuthCore) as CoreArc,
-            discourse_update_config: Default::default(),
-            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
+            discourse_update_config: Default::default()
         }
     }
 
@@ -435,25 +423,32 @@ mod test {
         fn issue_access(
             &self,
             _uid: i64,
-        ) -> Result<String, AppError>
+        ) -> Result<(String, i64), AppError>
         {
-            Ok("woohoo".into())
+            Ok(("woohoo".into(), 0))
         }
 
-        fn issue_refresh(
+        async fn issue_refresh(
             &self,
             _uid: i64,
-        ) -> Result<String, AppError>
+        ) -> Result<(String, i64), AppError>
         {
-            Ok("so refreshing".into())
+            Ok(("so refreshing".into(), 0))
+        }
+
+        async fn verify_refresh(
+            &self,
+            _session_id: &str
+        ) -> Result<Option<i64>, CoreError>
+        {
+            Ok(Some(0))
         }
     }
 
     fn test_state_ok_auth() -> AppState {
         AppState {
             core: Arc::new(OkAuthCore) as CoreArc,
-            discourse_update_config: Default::default(),
-            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
+            discourse_update_config: Default::default()
         }
     }
 
@@ -475,8 +470,7 @@ mod test {
     fn test_state_fail_auth() -> AppState {
         AppState {
             core: Arc::new(FailAuthCore) as CoreArc,
-            discourse_update_config: Default::default(),
-            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
+            discourse_update_config: Default::default()
         }
     }
 
@@ -494,10 +488,10 @@ mod test {
             Err(AppError::InternalError)
         }
 
-        fn issue_refresh(
+        async fn issue_refresh(
             &self,
             _uid: i64,
-        ) -> Result<String, AppError>
+        ) -> Result<(String, i64), AppError>
         {
             Err(AppError::InternalError)
         }
@@ -506,8 +500,7 @@ mod test {
     fn test_state_error_auth() -> AppState {
         AppState {
             core: Arc::new(ErrorAuthCore) as CoreArc,
-            discourse_update_config: Default::default(),
-            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
+            discourse_update_config: Default::default()
         }
     }
 
@@ -747,7 +740,7 @@ mod test {
             Request::builder()
                 .method(Method::POST)
                 .uri(&format!("{API_V1}/refresh"))
-                .header(AUTHORIZATION, token(BOB_UID, REFRESH_KEY))
+                .header(AUTHORIZATION, "Bearer so refreshing")
                 .body(Body::empty())
                 .unwrap()
         )
@@ -832,8 +825,7 @@ mod test {
                 DiscourseUpdateConfig {
                     secret: "12345".into()
                 }
-            ),
-            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
+            )
         }
     }
 
@@ -1051,8 +1043,7 @@ mod test {
     fn test_state_ok_sso_login() -> AppState {
         AppState {
             core: Arc::new(OkSsoLogin) as CoreArc,
-            discourse_update_config: Default::default(),
-            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
+            discourse_update_config: Default::default()
         }
     }
 
@@ -1142,25 +1133,24 @@ mod test {
         fn issue_access(
             &self,
             _uid: i64
-        ) -> Result<String, AppError>
+        ) -> Result<(String, i64), AppError>
         {
-            Ok("token!".into())
+            Ok(("token!".into(), 0))
         }
 
-        fn issue_refresh(
+        async fn issue_refresh(
             &self,
             _uid: i64
-        ) -> Result<String, AppError>
+        ) -> Result<(String, i64), AppError>
         {
-            Ok("refresh!".into())
+            Ok(("refresh!".into(), 0))
         }
     }
 
     fn test_state_ok_sso_complete_login() -> AppState {
         AppState {
             core: Arc::new(OkSsoCompleteLogin) as CoreArc,
-            discourse_update_config: Default::default(),
-            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
+            discourse_update_config: Default::default()
         }
     }
 
@@ -1183,20 +1173,36 @@ mod test {
         // cookies iterate in alphabetical order by name
         assert_eq!(
             c.next().unwrap(),
-            Cookie::build(("name", "Bob")).path("/")
+            Cookie::build(("name", "Bob"))
+                .path("/")
+                .secure(true)
+                .same_site(SameSite::Lax)
+                .expires(OffsetDateTime::UNIX_EPOCH)
         );
         assert_cookie_expired(c.next().unwrap(), "nonce");
         assert_eq!(
             c.next().unwrap(),
-            Cookie::build(("refresh", "refresh!")).path("/").secure(true)
+            Cookie::build(("refresh", "refresh!"))
+                .path("/")
+                .secure(true)
+                .same_site(SameSite::Lax)
+                .expires(OffsetDateTime::UNIX_EPOCH)
         );
         assert_eq!(
             c.next().unwrap(),
-            Cookie::build(("token", "token!")).path("/").secure(true).max_age(Duration::minutes(1))
+            Cookie::build(("token", "token!"))
+                .path("/")
+                .secure(true)
+                .same_site(SameSite::Lax)
+                .expires(OffsetDateTime::UNIX_EPOCH)
         );
         assert_eq!(
             c.next().unwrap(),
-            Cookie::build(("username", "bob")).path("/")
+            Cookie::build(("username", "bob"))
+                .path("/")
+                .secure(true)
+                .same_site(SameSite::Lax)
+                .expires(OffsetDateTime::UNIX_EPOCH)
         );
         assert_eq!(c.next(), None);
     }
@@ -1273,8 +1279,7 @@ mod test {
     fn test_state_ok_sso_complete_logout() -> AppState {
         AppState {
             core: Arc::new(DummyCore) as CoreArc,
-            discourse_update_config: Default::default(),
-            refresh_key: DecodingKey::from_secret(REFRESH_KEY)
+            discourse_update_config: Default::default()
         }
     }
 

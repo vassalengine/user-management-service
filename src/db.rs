@@ -22,4 +22,30 @@ pub trait DatabaseClient {
     {
         unimplemented!();
     }
+
+    async fn create_session(
+        &self,
+        _uid: i64,
+        _session_id: &str,
+        _expires: i64
+    ) -> Result<(), CoreError>
+    {
+        unimplemented!();
+    }
+
+    async fn verify_session(
+        &self,
+        _session_id: &str
+    ) -> Result<Option<i64>, CoreError>
+    {
+        unimplemented!();
+    }
+
+    async fn delete_session(
+        &self,
+        _session_id: &str,
+    ) -> Result<(), CoreError>
+    {
+        unimplemented!();
+    }
 }

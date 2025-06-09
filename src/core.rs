@@ -96,15 +96,31 @@ pub trait Core {
     fn issue_access(
         &self,
         _uid: i64
-    ) -> Result<String, AppError>
+    ) -> Result<(String, i64), AppError>
     {
         unimplemented!();
     }
 
-    fn issue_refresh(
+    async fn issue_refresh(
         &self,
         _uid: i64
-    ) -> Result<String, AppError>
+    ) -> Result<(String, i64), AppError>
+    {
+        unimplemented!();
+    }
+
+    async fn verify_refresh(
+        &self,
+        _session_id: &str
+    ) -> Result<Option<i64>, CoreError>
+    {
+        unimplemented!();
+    }
+
+    async fn revoke_refresh(
+        &self,
+        _session_id: &str
+    ) -> Result<(), AppError>
     {
         unimplemented!();
     }

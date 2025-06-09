@@ -30,6 +30,32 @@ impl DatabaseClient for SqlxDatabaseClient<Sqlite> {
     {
         update_user(&self.0, params).await
     }
+
+    async fn create_session(
+        &self,
+        uid: i64,
+        session_id: &str,
+        expires: i64
+    ) -> Result<(), CoreError>
+    {
+        create_session(&self.0, uid, session_id, expires).await
+    }
+
+    async fn verify_session(
+        &self,
+        session_id: &str
+    ) -> Result<Option<i64>, CoreError>
+    {
+        verify_session(&self.0, session_id).await
+    }
+
+    async fn delete_session(
+        &self,
+        session_id: &str,
+    ) -> Result<(), CoreError>
+    {
+        delete_session(&self.0, session_id).await
+    }
 }
 
 async fn get_user_avatar_template<'e, E>(
@@ -72,6 +98,75 @@ VALUES (?, ?, ?)
         params.id,
         params.username,
         params.avatar_template
+    )
+    .execute(ex)
+    .await?;
+
+    Ok(())
+}
+
+async fn create_session<'e, E>(
+    ex: E,
+    uid: i64,
+    session_id: &str,
+    expires: i64
+) -> Result<(), CoreError>
+where
+    E: Executor<'e, Database = Sqlite>
+{
+    sqlx::query!(
+        "
+INSERT OR REPLACE INTO sessions (
+    session_id,
+    user_id,
+    expires
+)
+VALUES (?, ?, ?)
+        ",
+        session_id,
+        uid,
+        expires
+    )
+    .execute(ex)
+    .await?;
+
+    Ok(())
+}
+
+async fn verify_session<'e, E>(
+    ex: E,
+    session_id: &str,
+) -> Result<Option<i64>, CoreError>
+where
+    E: Executor<'e, Database = Sqlite>
+{
+    Ok(
+        sqlx::query_scalar!(
+            "
+SELECT user_id
+FROM sessions
+WHERE session_id = ?
+            ",
+            session_id,
+        )
+        .fetch_optional(ex)
+        .await?
+    )
+}
+
+async fn delete_session<'e, E>(
+    ex: E,
+    session_id: &str,
+) -> Result<(), CoreError>
+where
+    E: Executor<'e, Database = Sqlite>
+{
+    sqlx::query!(
+        "
+DELETE FROM sessions
+WHERE session_id = ?
+        ",
+        session_id,
     )
     .execute(ex)
     .await?;

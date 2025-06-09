@@ -22,8 +22,8 @@ use unwrap_infallible::UnwrapInfallible;
 
 use crate::{
     app::DiscourseUpdateConfig,
+    core::CoreArc,
     errors::AppError,
-    jwt::{self, Claims, DecodingKey},
     signature::verify_signature
 };
 
@@ -41,10 +41,12 @@ where
         .0
 }
 
-impl<S> FromRequestParts<S> for Claims
+pub struct User(pub i64);
+
+impl<S> FromRequestParts<S> for User
 where
     S: Send + Sync,
-    DecodingKey: FromRef<S>
+    CoreArc: FromRef<S>
 {
     type Rejection = AppError;
 
@@ -60,11 +62,12 @@ where
             .or(Err(AppError::Unauthorized))?;
 
         // verify the token
-        let key = DecodingKey::from_ref(state);
-        let claims = jwt::verify(bearer.token(), &key)
-            .or(Err(AppError::Unauthorized))?;
+        let core: CoreArc = get_state(parts, state).await;
+        let uid = core.verify_refresh(bearer.token())
+            .await?
+            .ok_or(AppError::Unauthorized)?;
 
-        Ok(claims)
+        Ok(User(uid))
     }
 }
 

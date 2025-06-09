@@ -3,14 +3,13 @@ use axum::{
     response::{Json, Redirect}
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
-use time::Duration;
+use time::OffsetDateTime;
 use serde_json::Value;
 
 use crate::{
     core::CoreArc,
     errors::AppError,
-    extractors::DiscourseEvent,
-    jwt::Claims,
+    extractors::{DiscourseEvent, User},
     model::{LoginParams, LoginResponse, RefreshResponse, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, UserSearchParams, UserUpdatePost}
 };
 
@@ -29,18 +28,18 @@ pub async fn login_post(
         .ok_or(AppError::InternalError)?;
 
     Ok(Json(LoginResponse {
-        access: core.issue_access(uid)?,
-        refresh: core.issue_refresh(uid)?
+        access: core.issue_access(uid)?.0,
+        refresh: core.issue_refresh(uid).await?.0
     }))
 }
 
 pub async fn refresh_post(
-    claims: Claims,
+    user: User,
     State(core): State<CoreArc>
 ) -> Result<Json<RefreshResponse>, AppError>
 {
     Ok(Json(RefreshResponse {
-        token: core.issue_access(claims.sub)?
+        token: core.issue_access(user.0)?.0
     }))
 }
 
@@ -97,12 +96,24 @@ pub async fn sso_complete_login_get(
         &params.sig
     )?;
 
-    let access_token = core.issue_access(uid)?;
-    let refresh_token = core.issue_refresh(uid)?;
+// TODO: Set exipiry on cookies other than access token to match refresh token
+// TODO: Access token can be a session token?
+
+    let (access_token, access_exp) = core.issue_access(uid)?;
+    let (refresh_token, refresh_exp) = core.issue_refresh(uid).await?;
+
+    let access_exp = OffsetDateTime::from_unix_timestamp(access_exp)
+        .or(Err(AppError::InternalError))?;
+
+    let refresh_exp = OffsetDateTime::from_unix_timestamp(refresh_exp)
+        .or(Err(AppError::InternalError))?;
 
     let jar = if let Some(name) = name {
         jar.add(Cookie::build(("name", name))
-            .path("/").same_site(SameSite::Lax)
+            .path("/")
+            .secure(true)
+            .same_site(SameSite::Lax)
+            .expires(refresh_exp)
         )
     }
     else {
@@ -111,19 +122,21 @@ pub async fn sso_complete_login_get(
     .remove(Cookie::from("nonce"))
     .add(Cookie::build(("username", username))
         .path("/")
+        .secure(true)
         .same_site(SameSite::Lax)
+        .expires(refresh_exp)
     )
     .add(Cookie::build(("token", access_token))
         .path("/")
         .secure(true)
         .same_site(SameSite::Lax)
-// FIXME: temporary
-        .max_age(Duration::minutes(1))
+        .expires(access_exp)
     )
     .add(Cookie::build(("refresh", refresh_token))
         .path("/")
         .secure(true)
         .same_site(SameSite::Lax)
+        .expires(refresh_exp)
     );
 
     Ok((jar, Redirect::to(&params.returnto)))
@@ -131,14 +144,22 @@ pub async fn sso_complete_login_get(
 
 pub async fn sso_complete_logout_get(
     Query(params): Query<SsoLogoutResponseParams>,
-    jar: CookieJar
+    jar: CookieJar,
+    State(core): State<CoreArc>
 ) -> Result<(CookieJar, Redirect), AppError>
 {
+    if let Some(refresh_token) = jar.get("refresh").map(Cookie::value) {
+        core.revoke_refresh(refresh_token).await?;
+    }
+
     Ok(
         (
-            jar.remove(Cookie::from("nonce"))
-                .remove(Cookie::build(("username", "")).path("/"))
-                .remove(Cookie::build(("name", "")).path("/")),
+            jar
+                .remove(Cookie::from("name"))
+                .remove(Cookie::from("nonce"))
+                .remove(Cookie::from("token"))
+                .remove(Cookie::from("refresh"))
+                .remove(Cookie::from("username")),
             Redirect::to(&params.returnto)
         )
     )

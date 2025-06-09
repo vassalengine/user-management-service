@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use rand::distr::{Alphanumeric, SampleString};
 use serde_json::Value;
 
 use crate::{
@@ -23,9 +24,8 @@ pub struct ProdCore<C: DatabaseClient> {
     pub now: fn() -> DateTime<Utc>,
     pub auth: DiscourseAuth,
     pub access_key: EncodingKey,
-    pub access_key_ttl: u64,
-    pub refresh_key: EncodingKey,
-    pub refresh_key_ttl: u64
+    pub access_key_ttl: i64,
+    pub refresh_ttl: i64
 }
 
 #[async_trait]
@@ -126,33 +126,46 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
     fn issue_access(
         &self,
         uid: i64
-    ) -> Result<String, AppError>
+    ) -> Result<(String, i64), AppError>
     {
-        let now = (self.now)().timestamp()
-            .try_into()
-            .or(Err(AppError::InternalError))?;
-        Ok(jwt::issue(
-            &self.access_key,
-            uid,
-            now,
-            now + self.access_key_ttl
-        )?)
+        let now = (self.now)().timestamp();
+        let exp = now + self.access_key_ttl;
+
+        Ok((jwt::issue(&self.access_key, uid, now, exp)?, exp))
     }
 
-    fn issue_refresh(
+    async fn issue_refresh(
         &self,
         uid: i64
-    ) -> Result<String, AppError>
+    ) -> Result<(String, i64), AppError>
     {
-        let now = (self.now)().timestamp()
-            .try_into()
-            .or(Err(AppError::InternalError))?;
-        Ok(jwt::issue(
-            &self.refresh_key,
-            uid,
-            now,
-            now + self.refresh_key_ttl
-        )?)
+        let now = (self.now)().timestamp();
+        let exp = now + self.refresh_ttl;
+
+        let session_id = {
+            let mut rng = rand::rng();
+            Alphanumeric.sample_string(&mut rng, 64)
+        };
+
+        self.db.create_session(uid, &session_id, exp).await?;
+
+        Ok((session_id, exp))
+    }
+
+    async fn verify_refresh(
+        &self,
+        session_id: &str
+    ) -> Result<Option<i64>, CoreError>
+    {
+        Ok(self.db.verify_session(&session_id).await?)
+    }
+
+    async fn revoke_refresh(
+        &self,
+        session_id: &str
+    ) -> Result<(), AppError>
+    {
+        Ok(self.db.delete_session(&session_id).await?)
     }
 }
 
