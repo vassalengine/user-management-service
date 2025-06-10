@@ -157,7 +157,8 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         session_id: &str
     ) -> Result<Option<i64>, CoreError>
     {
-        Ok(self.db.verify_session(&session_id).await?)
+        let now = (self.now)().timestamp();
+        Ok(self.db.verify_session(&session_id, now).await?)
     }
 
     async fn revoke_refresh(

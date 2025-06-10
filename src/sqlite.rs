@@ -43,10 +43,11 @@ impl DatabaseClient for SqlxDatabaseClient<Sqlite> {
 
     async fn verify_session(
         &self,
-        session_id: &str
+        session_id: &str,
+        now: i64
     ) -> Result<Option<i64>, CoreError>
     {
-        verify_session(&self.0, session_id).await
+        verify_session(&self.0, session_id, now).await
     }
 
     async fn delete_session(
@@ -136,6 +137,7 @@ VALUES (?, ?, ?)
 async fn verify_session<'e, E>(
     ex: E,
     session_id: &str,
+    now: i64
 ) -> Result<Option<i64>, CoreError>
 where
     E: Executor<'e, Database = Sqlite>
@@ -146,8 +148,10 @@ where
 SELECT user_id
 FROM sessions
 WHERE session_id = ?
+AND expires > ?
             ",
             session_id,
+            now
         )
         .fetch_optional(ex)
         .await?

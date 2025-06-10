@@ -35,7 +35,8 @@ pub trait DatabaseClient {
 
     async fn verify_session(
         &self,
-        _session_id: &str
+        _session_id: &str,
+        _now: i64
     ) -> Result<Option<i64>, CoreError>
     {
         unimplemented!();
