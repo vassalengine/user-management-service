@@ -173,11 +173,15 @@ fn routes(api: &str, log_headers: bool) -> Router<AppState> {
             &format!("{api}/sso/logout"),
             get(handlers::sso_logout_get)
         )
+// TODO: move Discourse webhook outside of the api
+        .route(
+            &format!("{api}/sso/userEvent"),
+            post(handlers::sso_user_event_post)
+        )
 // TODO: users tests
         .route(
             &format!("{api}/users"),
             get(handlers::users_get)
-            .post(handlers::users_post)
         )
         .route(
             &format!("{api}/users/{{username}}"),
@@ -853,7 +857,7 @@ mod test {
             test_state_ok_update_user(),
             Request::builder()
                 .method(Method::POST)
-                .uri(formatcp!("{API_V1}/users"))
+                .uri(formatcp!("{API_V1}/sso/userEvent"))
                 .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                 .header("X-Discourse-Event-Signature", hval)
                 .body(Body::from(UPDATE_MSG.clone()))
@@ -871,7 +875,7 @@ mod test {
             test_state_ok_update_user(),
             Request::builder()
                 .method(Method::POST)
-                .uri(formatcp!("{API_V1}/users"))
+                .uri(formatcp!("{API_V1}/sso/userEvent"))
                 .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                 .body(Body::from(UPDATE_MSG.clone()))
                 .unwrap()
@@ -887,7 +891,7 @@ mod test {
             test_state_ok_update_user(),
             Request::builder()
                 .method(Method::POST)
-                .uri(formatcp!("{API_V1}/users"))
+                .uri(formatcp!("{API_V1}/sso/userEvent"))
                 .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                 .header("X-Discourse-Event-Signature", "bogus")
                 .body(Body::from(UPDATE_MSG.clone()))
@@ -904,7 +908,7 @@ mod test {
             test_state_ok_update_user(),
             Request::builder()
                 .method(Method::POST)
-                .uri(formatcp!("{API_V1}/users"))
+                .uri(formatcp!("{API_V1}/sso/userEvent"))
                 .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                 .header("X-Discourse-Event-Signature", "sha257=ff")
                 .body(Body::from(UPDATE_MSG.clone()))
@@ -921,7 +925,7 @@ mod test {
             test_state_ok_update_user(),
             Request::builder()
                 .method(Method::POST)
-                .uri(formatcp!("{API_V1}/users"))
+                .uri(formatcp!("{API_V1}/sso/userEvent"))
                 .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                 .header("X-Discourse-Event-Signature", "sha256=bogus")
                 .body(Body::from(UPDATE_MSG.clone()))
@@ -939,7 +943,7 @@ mod test {
             test_state_ok_update_user(),
             Request::builder()
                 .method(Method::POST)
-                .uri(formatcp!("{API_V1}/users"))
+                .uri(formatcp!("{API_V1}/sso/userEvent"))
                 .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                 .header("X-Discourse-Event-Signature", hval)
                 .body(Body::from(UPDATE_MSG.clone()))
@@ -957,7 +961,7 @@ mod test {
             test_state_ok_update_user(),
             Request::builder()
                 .method(Method::POST)
-                .uri(formatcp!("{API_V1}/users"))
+                .uri(formatcp!("{API_V1}/sso/userEvent"))
                 .header("X-Discourse-Event-Signature", hval)
                 .body(Body::from(UPDATE_MSG.clone()))
                 .unwrap()
@@ -974,7 +978,7 @@ mod test {
             test_state_ok_update_user(),
             Request::builder()
                 .method(Method::POST)
-                .uri(formatcp!("{API_V1}/users"))
+                .uri(formatcp!("{API_V1}/sso/userEvent"))
                 .header(CONTENT_TYPE, TEXT_PLAIN.as_ref())
                 .header("X-Discourse-Event-Signature", hval)
                 .body(Body::from(UPDATE_MSG.clone()))
@@ -997,7 +1001,7 @@ mod test {
             test_state_ok_update_user(),
             Request::builder()
                 .method(Method::POST)
-                .uri(formatcp!("{API_V1}/users"))
+                .uri(formatcp!("{API_V1}/sso/userEvent"))
                 .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                 .header("X-Discourse-Event-Signature", hval)
                 .body(Body::from(b))

@@ -165,6 +165,14 @@ pub async fn sso_complete_logout_get(
     )
 }
 
+pub async fn sso_user_event_post(
+    State(core): State<CoreArc>,
+    DiscourseEvent(data): DiscourseEvent<UserUpdatePost>
+) -> Result<(), AppError>
+{
+    Ok(core.update_user(&data.user).await?)
+}
+
 /*
 pub async fn users_get(
     Query(params): Query<UserSearchParams>,
@@ -194,14 +202,6 @@ pub async fn users_username_get(
 ) -> Result<Redirect, AppError>
 {
     Ok(Redirect::to(&core.get_user_url(&username)?))
-}
-
-pub async fn users_post(
-    State(core): State<CoreArc>,
-    DiscourseEvent(data): DiscourseEvent<UserUpdatePost>
-) -> Result<(), AppError>
-{
-    Ok(core.update_user(&data.user).await?)
 }
 
 pub async fn users_username_avatar_size_get(
