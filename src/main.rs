@@ -1012,7 +1012,7 @@ mod test {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
-    fn cookies(response: &Response) -> Vec<Cookie> {
+    fn cookies(response: &Response) -> Vec<Cookie<'_>> {
         let mut cookies = response.headers()
             .get_all(SET_COOKIE)
             .iter()

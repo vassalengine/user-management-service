@@ -158,7 +158,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
     ) -> Result<Option<i64>, CoreError>
     {
         let now = (self.now)().timestamp();
-        Ok(self.db.verify_session(&session_id, now).await?)
+        Ok(self.db.verify_session(session_id, now).await?)
     }
 
     async fn revoke_refresh(
@@ -166,7 +166,7 @@ impl<C: DatabaseClient + Send + Sync> Core for ProdCore<C> {
         session_id: &str
     ) -> Result<(), AppError>
     {
-        Ok(self.db.delete_session(&session_id).await?)
+        Ok(self.db.delete_session(session_id).await?)
     }
 }
 
