@@ -743,7 +743,7 @@ mod test {
             test_state_ok_auth(),
             Request::builder()
                 .method(Method::POST)
-                .uri(&format!("{API_V1}/refresh"))
+                .uri(format!("{API_V1}/refresh"))
                 .header(AUTHORIZATION, "Bearer so refreshing")
                 .body(Body::empty())
                 .unwrap()
