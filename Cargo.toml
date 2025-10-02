@@ -33,8 +33,8 @@ thiserror = "2"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
 toml = "0.9"
+tower = { version = "0.5", features = ["limit", "util"] }
 tower-http = { version = "0.6", features = ["cors", "timeout", "trace"] }
-tower = { version = "0.5", features = ["buffer", "limit", "util"] }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-panic = { version = "0.1", features = ["capture-backtrace"] }
