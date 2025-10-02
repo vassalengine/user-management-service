@@ -17,8 +17,6 @@ use axum_extra::{
 use mime::{APPLICATION_JSON, Mime};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
-// TODO: replace with into_ok() when that's available
-use unwrap_infallible::UnwrapInfallible;
 
 use crate::{
     app::DiscourseUpdateConfig,
@@ -35,10 +33,9 @@ where
     S: Send + Sync,
     T: FromRef<S>
 {
-    State::<T>::from_request_parts(parts, state)
-        .await
-        .unwrap_infallible()
-        .0
+    let Ok(s) = State::<T>::from_request_parts(parts, state)
+        .await;
+    s.0
 }
 
 pub struct User(pub i64);
