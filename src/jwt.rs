@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[error("{0}")]
 pub struct Error(#[from] jsonwebtoken::errors::Error);
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Claims {
     pub sub: i64,
     pub iat: i64,

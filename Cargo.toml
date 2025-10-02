@@ -19,7 +19,7 @@ digest = { version = "0.10", features = ["mac"] }
 hex = "0.4"
 hmac = "0.12"
 itertools = "0.14"
-jsonwebtoken = "9"
+jsonwebtoken = { version = "10", default-features = false, features = ["aws_lc_rs"] }
 mime = "0.3"
 once_cell = "1.19"
 rand = "0.9"
