@@ -16,6 +16,7 @@ base64 = "0.22"
 chrono = "0.4"
 const_format = "0.2"
 digest = { version = "0.10", features = ["mac"] }
+glc = { path = "../game-library-common" }
 hex = "0.4"
 hmac = "0.12"
 itertools = "0.14"

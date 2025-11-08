@@ -783,6 +783,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "glc"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "serde",
+ "thiserror 2.0.17",
+ "urlencoding",
+]
+
+[[package]]
 name = "glob"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2783,6 +2793,7 @@ dependencies = [
  "chrono",
  "const_format",
  "digest",
+ "glc",
  "hex",
  "hmac",
  "itertools 0.14.0",
