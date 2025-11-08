@@ -1,22 +1,20 @@
 use axum::{
-    Router, serve,
-    body::Body,
+    Router,
     http::StatusCode,
     response::{IntoResponse, Json, Response},
     routing::{get, post}
 };
 use chrono::Utc;
-use glc::server::{setup_logging, shutdown_signal, SpanMaker};
+use glc::server::{setup_logging, serve, SpanMaker};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{
     fs,
     io,
-    net::{IpAddr, SocketAddr},
+    net::IpAddr,
     sync::Arc,
     time::Duration
 };
-use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
     cors::CorsLayer,
@@ -213,16 +211,7 @@ async fn run() -> Result<(), StartupError> {
     ).with_state(state);
 
     let ip: IpAddr = config.listen_ip.parse()?;
-    let addr = SocketAddr::from((ip, config.listen_port));
-    let listener = TcpListener::bind(addr).await?;
-    info!("Listening on {}", addr);
-
-    serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>()
-    )
-    .with_graceful_shutdown(shutdown_signal())
-    .await?;
+    serve(app, ip, config.listen_port).await?;
 
     Ok(())
 }
