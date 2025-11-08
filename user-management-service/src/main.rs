@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post}
 };
 use chrono::Utc;
-use glc::server::{real_addr, shutdown_signal, SpanMaker};
+use glc::server::{real_addr, setup_logging, shutdown_signal, SpanMaker};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{
@@ -25,7 +25,6 @@ use tower_http::{
     trace::{DefaultOnFailure, DefaultOnResponse, TraceLayer}
 };
 use tracing::{error, info, Level};
-use tracing_panic::panic_hook;
 use tracing_subscriber::{
     EnvFilter,
     layer::SubscriberExt,
@@ -237,33 +236,7 @@ async fn run() -> Result<(), StartupError> {
 #[tokio::main]
 async fn main() {
     // set up logging
-    // TODO: make log location configurable
-    let file_appender = tracing_appender::rolling::daily("", "ums.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-
-    tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| {
-                [
-                    // log this crate at info level
-                    &format!("{}=info", env!("CARGO_CRATE_NAME")),
-                    // tower_http is noisy below info
-                    "tower_http=info",
-                    // axum::rejection=trace shows rejections from extractors
-                    "axum::rejection=trace",
-                    // every panic is a fatal error
-                    "tracing_panic=error"
-                ].join(",").into()
-            })
-        )
-        .with(tracing_subscriber::fmt::layer()
-            .with_target(false)
-            .with_writer(non_blocking)
-        )
-        .init();
-
-    // ensure that panics are logged
-    std::panic::set_hook(Box::new(panic_hook));
+    let _guard = setup_logging("ums.log");
 
     info!("Starting");
 

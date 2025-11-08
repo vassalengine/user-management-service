@@ -792,6 +792,9 @@ dependencies = [
  "tokio",
  "tower-http",
  "tracing",
+ "tracing-appender",
+ "tracing-panic",
+ "tracing-subscriber",
  "urlencoding",
 ]
 
