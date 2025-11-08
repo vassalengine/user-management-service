@@ -25,11 +25,6 @@ use tower_http::{
     trace::{DefaultOnFailure, DefaultOnResponse, TraceLayer}
 };
 use tracing::{error, info, Level};
-use tracing_subscriber::{
-    EnvFilter,
-    layer::SubscriberExt,
-    util::SubscriberInitExt
-};
 
 mod app;
 mod auth_provider;

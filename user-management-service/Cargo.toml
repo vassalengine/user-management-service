@@ -37,9 +37,6 @@ toml = "0.9"
 tower = { version = "0.5", features = ["limit", "util"] }
 tower-http = { version = "0.6", features = ["cors", "timeout", "trace"] }
 tracing = "0.1"
-tracing-appender = "0.2"
-tracing-panic = { version = "0.1", features = ["capture-backtrace"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 urlencoding = "2"
 
 [dev-dependencies]

@@ -750,6 +750,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "game-library-frontend"
+version = "0.1.0"
+dependencies = [
+ "askama",
+ "axum",
+ "bytes",
+ "futures",
+ "glc",
+ "http",
+ "mime",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "toml",
+ "tower",
+ "tower-http",
+ "tracing",
+ "urlencoding",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -803,6 +826,53 @@ name = "glob"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
+
+[[package]]
+name = "gls"
+version = "0.1.0"
+dependencies = [
+ "async-tempfile",
+ "async-trait",
+ "axum",
+ "axum-extra",
+ "chrono",
+ "const_format",
+ "futures",
+ "futures-util",
+ "glc",
+ "http",
+ "http-body-util",
+ "infer",
+ "itertools 0.14.0",
+ "jsonwebtoken",
+ "mime",
+ "nix",
+ "num-bigint",
+ "once_cell",
+ "rand 0.9.2",
+ "regex",
+ "rust-s3",
+ "semver",
+ "serde",
+ "serde_html_form",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "sxd-document",
+ "sxd-xpath",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "tower",
+ "tower-http",
+ "tracing",
+ "unicode-ccc",
+ "unicode-normalization",
+ "unicode-properties",
+ "urlencoding",
+ "zip",
+]
 
 [[package]]
 name = "h2"
@@ -2820,9 +2890,6 @@ dependencies = [
  "tower",
  "tower-http",
  "tracing",
- "tracing-appender",
- "tracing-panic",
- "tracing-subscriber",
  "urlencoding",
  "wiremock",
 ]
