@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post}
 };
 use chrono::Utc;
-use glc::server::{real_addr, SpanMaker};
+use glc::server::{real_addr, shutdown_signal, SpanMaker};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{
@@ -165,26 +165,6 @@ enum StartupError {
     Database(#[from] sqlx::Error),
     #[error("{0}")]
     IOError(#[from] io::Error)
-}
-
-async fn shutdown_signal() {
-    use tokio::signal::unix::{signal, SignalKind};
-
-    let mut interrupt = signal(SignalKind::interrupt())
-        .expect("failed to install signal handler");
-
-    // Docker sends SIGQUIT for some unfathomable reason
-    let mut quit = signal(SignalKind::quit())
-        .expect("failed to install signal handler");
-
-    let mut terminate = signal(SignalKind::terminate())
-        .expect("failed to install signal handler");
-
-    tokio::select! {
-        _ = interrupt.recv() => info!("received SIGINT"),
-        _ = quit.recv() => info!("received SIGQUIT"),
-        _ = terminate.recv() => info!("received SIGTERM")
-    }
 }
 
 #[derive(Debug, Deserialize)]
