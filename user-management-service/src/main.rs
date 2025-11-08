@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post}
 };
 use chrono::Utc;
-use glc::server::real_addr;
+use glc::server::{real_addr, SpanMaker};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{
@@ -22,9 +22,9 @@ use tower::ServiceBuilder;
 use tower_http::{
     cors::CorsLayer,
     timeout::TimeoutLayer,
-    trace::{DefaultOnFailure, DefaultOnResponse, MakeSpan, TraceLayer}
+    trace::{DefaultOnFailure, DefaultOnResponse, TraceLayer}
 };
-use tracing::{error, info, info_span, Level, Span};
+use tracing::{error, info, Level};
 use tracing_panic::panic_hook;
 use tracing_subscriber::{
     EnvFilter,
@@ -88,46 +88,6 @@ impl IntoResponse for AppError {
         let code = StatusCode::from(&self);
         let body = Json(HttpError::from(self));
         (code, body).into_response()
-    }
-}
-
-#[derive(Clone, Debug)]
-struct SpanMaker {
-    include_headers: bool
-}
-
-impl SpanMaker {
-    pub fn new() -> Self {
-        Self { include_headers: false }
-    }
-
-    pub fn include_headers(mut self, include_headers: bool) -> Self {
-        self.include_headers = include_headers;
-        self
-    }
-}
-
-impl MakeSpan<Body> for SpanMaker {
-    fn make_span(&mut self, request: &Request<Body>) -> Span {
-        if self.include_headers {
-            info_span!(
-                "request",
-                source = %real_addr(request),
-                method = %request.method(),
-                uri = %request.uri(),
-                version = ?request.version(),
-                headers = ?request.headers()
-            )
-        }
-        else {
-            info_span!(
-                "request",
-                source = %real_addr(request),
-                method = %request.method(),
-                uri = %request.uri(),
-                version = ?request.version()
-            )
-        }
     }
 }
 
