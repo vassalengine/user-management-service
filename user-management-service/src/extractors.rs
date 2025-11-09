@@ -67,7 +67,7 @@ where
         state: &S
     ) -> Result<Self, Self::Rejection>
     {
-        let (mut parts, body) = req.into_parts();
+        let (parts, body) = req.into_parts();
         let uc = Arc::<DiscourseUpdateConfig>::from_ref(state);
         let payload = parse_event(&parts.headers, body, &uc.secret).await?;
         Ok(DiscourseEvent(payload))
