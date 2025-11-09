@@ -243,7 +243,10 @@ mod test {
     };
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use const_format::formatcp;
-    use glc::signature::make_signature;
+    use glc::{
+        discourse::{UserUpdateParams, UserUpdatePost},
+        signature::make_signature
+    };
     use once_cell::sync::Lazy;
     use mime::{APPLICATION_JSON, TEXT_PLAIN};
     use serde::Deserialize;
@@ -253,7 +256,7 @@ mod test {
 
     use crate::{
         core::{Core, CoreError},
-        model::{LoginParams, LoginResponse, RefreshResponse, UserUpdatePost, UserUpdateParams},
+        model::{LoginParams, LoginResponse, RefreshResponse}
     };
 
     const API_V1: &str = "/api/v1";

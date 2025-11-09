@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use glc::discourse::UserUpdateParams;
 use sqlx::{
     Database, Executor,
     sqlite::Sqlite
@@ -6,8 +7,7 @@ use sqlx::{
 
 use crate::{
     core::CoreError,
-    db::DatabaseClient,
-    model::UserUpdateParams
+    db::DatabaseClient
 };
 
 #[derive(Clone)]

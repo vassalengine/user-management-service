@@ -40,15 +40,3 @@ pub struct UserSearchParams {
     pub term: String,
     pub limit: u32
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct UserUpdateParams {
-    pub id: u32,
-    pub username: String,
-    pub avatar_template: String
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct UserUpdatePost {
-    pub user: UserUpdateParams
-}

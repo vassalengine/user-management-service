@@ -5,7 +5,10 @@ use axum::{
 };
 use http::header::HeaderMap;
 use mime::{APPLICATION_JSON, Mime};
-use serde::de::DeserializeOwned;
+use serde::{
+    Deserialize, Serialize,
+    de::DeserializeOwned
+};
 use thiserror::Error;
 
 use crate::signature::verify_signature;
@@ -68,4 +71,16 @@ where
     Json::<T>::from_bytes(&bytes)
         .map(|j| j.0)
         .or(Err(DiscourseEventError::MalformedQuery))
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UserUpdateParams {
+    pub id: u32,
+    pub username: String,
+    pub avatar_template: String
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UserUpdatePost {
+    pub user: UserUpdateParams
 }

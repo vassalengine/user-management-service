@@ -1,9 +1,7 @@
 use async_trait::async_trait;
+use glc::discourse::UserUpdateParams;
 
-use crate::{
-    core::CoreError,
-    model::UserUpdateParams
-};
+use crate::core::CoreError;
 
 #[async_trait]
 pub trait DatabaseClient {

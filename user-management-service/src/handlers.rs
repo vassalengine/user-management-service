@@ -3,6 +3,7 @@ use axum::{
     response::{Json, Redirect}
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
+use glc::discourse::UserUpdatePost;
 use time::OffsetDateTime;
 use serde_json::Value;
 
@@ -10,7 +11,7 @@ use crate::{
     core::CoreArc,
     errors::AppError,
     extractors::{DiscourseEvent, User},
-    model::{LoginParams, LoginResponse, RefreshResponse, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, UserSearchParams, UserUpdatePost}
+    model::{LoginParams, LoginResponse, RefreshResponse, SsoLoginParams, SsoLoginResponseParams, SsoLogoutResponseParams, UserSearchParams}
 };
 
 pub async fn root_get() -> &'static str {

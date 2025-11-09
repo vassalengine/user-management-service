@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use glc::discourse::UserUpdateParams;
 use serde_json::Value;
 use std::{
     mem,
@@ -6,10 +7,7 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::{
-    errors::{AppError, RequestError},
-    model::UserUpdateParams
-};
+use crate::errors::{AppError, RequestError};
 
 #[derive(Debug, Error)]
 pub enum CoreError {

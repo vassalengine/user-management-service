@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use glc::discourse::UserUpdateParams;
 use rand::distr::{Alphanumeric, SampleString};
 use serde_json::Value;
 
@@ -13,7 +14,6 @@ use crate::{
     },
     errors::AppError,
     jwt::{self, EncodingKey},
-    model::UserUpdateParams,
     search::user_search
 };
 
