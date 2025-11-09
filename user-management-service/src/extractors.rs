@@ -14,6 +14,7 @@ use axum_extra::{
         authorization::Bearer
     }
 };
+use glc::extract::get_state;
 use mime::{APPLICATION_JSON, Mime};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
@@ -24,19 +25,6 @@ use crate::{
     errors::AppError,
     signature::verify_signature
 };
-
-async fn get_state<S, T>(
-    parts: &mut Parts,
-    state: &S
-) -> T 
-where
-    S: Send + Sync,
-    T: FromRef<S>
-{
-    let Ok(s) = State::<T>::from_request_parts(parts, state)
-        .await;
-    s.0
-}
 
 pub struct User(pub i64);
 
