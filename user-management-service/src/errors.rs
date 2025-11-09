@@ -1,3 +1,4 @@
+use glc::discourse::DiscourseEventError;
 use thiserror::Error;
 
 use crate::{
@@ -62,6 +63,16 @@ impl From<auth_provider::Failure> for AppError {
             auth_provider::Failure::Unauthorized => {
                 AppError::Unauthorized
             }
+        }
+    }
+}
+
+impl From<DiscourseEventError> for AppError {
+    fn from(e: DiscourseEventError) -> Self {
+        match e {
+            DiscourseEventError::BadMimeType => AppError::BadMimeType,
+            DiscourseEventError::MalformedQuery => AppError::MalformedQuery,
+            DiscourseEventError::Unauthorized => AppError::Unauthorized
         }
     }
 }

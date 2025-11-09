@@ -1,11 +1,8 @@
 use axum::{
     RequestPartsExt,
-    body::{self, Bytes},
-    extract::{FromRef, FromRequest, FromRequestParts, Json, Request, State},
-    http::{
-        header::CONTENT_TYPE,
-        request::Parts
-    }
+    body::Bytes,
+    extract::{FromRef, FromRequest, FromRequestParts, Request},
+    http::request::Parts
 };
 use axum_extra::{
     TypedHeader,
@@ -15,10 +12,9 @@ use axum_extra::{
     }
 };
 use glc::{
+    discourse::parse_event,
     extract::get_state,
-    signature::verify_signature
 };
-use mime::{APPLICATION_JSON, Mime};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 
@@ -76,37 +72,10 @@ where
     {
         let (mut parts, body) = req.into_parts();
 
-        // check that the Content-Type is application/json
-        parts.headers.get(CONTENT_TYPE)
-            .and_then(|hv| hv.to_str().ok()) 
-            .and_then(|ct| ct.parse::<Mime>().ok())
-            .filter(|mime| mime == &APPLICATION_JSON)
-            .ok_or(AppError::BadMimeType)?;
-
-        // get the signature from the header
-        let sig = match parts.headers.get("X-Discourse-Event-Signature") {
-            Some(val) => match val.as_bytes().strip_prefix(b"sha256=") {
-                Some(hex) => hex::decode(hex)
-                    .or(Err(AppError::Unauthorized)),
-                None => Err(AppError::Unauthorized)
-            },
-            None => Err(AppError::Unauthorized)
-        }?;
-
-        // get the body and verify the signature
-        let bytes = body::to_bytes(body, usize::MAX)
-            .await
-            .or(Err(AppError::MalformedQuery))?;
-
         let duc: Arc<DiscourseUpdateConfig> = get_state(&mut parts, state)
             .await; 
 
-        verify_signature(&bytes, &duc.secret, &sig)
-            .or(Err(AppError::Unauthorized))?;
-
-        // it checks out, parse the JSON
-        let Json(payload) = Json::<T>::from_bytes(&bytes)
-            .or(Err(AppError::MalformedQuery))?;
+        let payload = parse_event(&parts.headers, body, &duc.secret).await?;
 
         Ok(DiscourseEvent(payload))
     }
