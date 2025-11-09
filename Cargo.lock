@@ -810,8 +810,11 @@ name = "glc"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "digest",
+ "hmac",
  "nix",
  "serde",
+ "sha2",
  "thiserror 2.0.17",
  "tokio",
  "tower-http",

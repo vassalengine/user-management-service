@@ -35,7 +35,6 @@ mod jwt;
 mod model;
 mod prod_core;
 mod search;
-mod signature;
 mod sqlite;
 
 use crate::{
@@ -244,8 +243,9 @@ mod test {
     };
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use const_format::formatcp;
-    use mime::{APPLICATION_JSON, TEXT_PLAIN};
+    use glc::signature::make_signature;
     use once_cell::sync::Lazy;
+    use mime::{APPLICATION_JSON, TEXT_PLAIN};
     use serde::Deserialize;
     use serde_json::{json, Value};
     use time::OffsetDateTime;
@@ -254,7 +254,6 @@ mod test {
     use crate::{
         core::{Core, CoreError},
         model::{LoginParams, LoginResponse, RefreshResponse, UserUpdatePost, UserUpdateParams},
-        signature::make_signature
     };
 
     const API_V1: &str = "/api/v1";

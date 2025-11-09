@@ -14,7 +14,10 @@ use axum_extra::{
         authorization::Bearer
     }
 };
-use glc::extract::get_state;
+use glc::{
+    extract::get_state,
+    signature::verify_signature
+};
 use mime::{APPLICATION_JSON, Mime};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
@@ -23,7 +26,6 @@ use crate::{
     app::DiscourseUpdateConfig,
     core::CoreArc,
     errors::AppError,
-    signature::verify_signature
 };
 
 pub struct User(pub i64);

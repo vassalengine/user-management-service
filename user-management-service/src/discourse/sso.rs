@@ -1,9 +1,8 @@
 use base64::{Engine as _};
+use glc::signature::{make_signature, verify_signature};
 use rand::distr::{Alphanumeric, SampleString};
 use std::collections::HashMap;
 use thiserror::Error;
-
-use crate::signature::{make_signature, verify_signature};
 
 // Reference: https://meta.discourse.org/t/setup-discourseconnect-official-single-sign-on-for-discourse-sso/13045
 
