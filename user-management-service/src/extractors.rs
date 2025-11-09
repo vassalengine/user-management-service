@@ -11,10 +11,7 @@ use axum_extra::{
         authorization::Bearer
     }
 };
-use glc::{
-    discourse::parse_event,
-    extract::get_state,
-};
+use glc::discourse::parse_event;
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 
@@ -45,7 +42,7 @@ where
             .or(Err(AppError::Unauthorized))?;
 
         // verify the token
-        let core: CoreArc = get_state(parts, state).await;
+        let core = CoreArc::from_ref(state);
         let uid = core.verify_refresh(bearer.token())
             .await?
             .ok_or(AppError::Unauthorized)?;
@@ -71,12 +68,8 @@ where
     ) -> Result<Self, Self::Rejection>
     {
         let (mut parts, body) = req.into_parts();
-
-        let duc: Arc<DiscourseUpdateConfig> = get_state(&mut parts, state)
-            .await; 
-
-        let payload = parse_event(&parts.headers, body, &duc.secret).await?;
-
+        let uc = Arc::<DiscourseUpdateConfig>::from_ref(state);
+        let payload = parse_event(&parts.headers, body, &uc.secret).await?;
         Ok(DiscourseEvent(payload))
     }
 }
