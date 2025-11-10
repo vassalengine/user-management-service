@@ -97,7 +97,6 @@ pub async fn sso_complete_login_get(
         &params.sig
     )?;
 
-// TODO: Set exipiry on cookies other than access token to match refresh token
 // TODO: Access token can be a session token?
 
     let (access_token, access_exp) = core.issue_access(uid)?;

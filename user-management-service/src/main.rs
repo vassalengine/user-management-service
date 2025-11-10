@@ -95,6 +95,7 @@ fn routes(api: &str, log_headers: bool) -> Router<AppState> {
             &format!("{api}/refresh"),
             post(handlers::refresh_post)
         )
+// TODO: move sso outside of the api?
         .route(
             &format!("{api}/sso/completeLogin"),
             get(handlers::sso_complete_login_get)
