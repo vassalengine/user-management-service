@@ -10,7 +10,7 @@ edition = "2024"
 
 [dependencies]
 async-trait = "0.1"
-axum-extra = { version = "0.10", features = ["cookie", "typed-header"] }
+axum-extra = { version = "0.12", features = ["cookie", "typed-header"] }
 axum = { version = "0.8", features = ["http1", "http2", "json", "macros", "query", "tokio"] }
 base64 = "0.22"
 chrono = "0.4"
