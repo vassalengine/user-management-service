@@ -248,10 +248,10 @@ mod test {
         discourse::{UserUpdateParams, UserUpdatePost},
         signature::make_signature
     };
-    use once_cell::sync::Lazy;
     use mime::{APPLICATION_JSON, TEXT_PLAIN};
     use serde::Deserialize;
     use serde_json::{json, Value};
+    use std::sync::LazyLock;
     use time::OffsetDateTime;
     use tower::ServiceExt; // for oneshot
 
@@ -720,7 +720,7 @@ mod test {
         }
     }
 
-    static UPDATE_MSG: Lazy<Vec<u8>> = Lazy::new(||
+    static UPDATE_MSG: LazyLock<Vec<u8>> = LazyLock::new(||
         serde_json::to_vec(
             &UserUpdatePost {
                 user: UserUpdateParams {
