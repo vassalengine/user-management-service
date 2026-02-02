@@ -23,7 +23,7 @@ itertools = "0.14"
 jsonwebtoken = { version = "10", default-features = false, features = ["aws_lc_rs"] }
 mime = "0.3"
 rand = "0.9"
-reqwest = { version = "0.12", features = ["cookies", "json"] }
+reqwest = { version = "0.13", features = ["cookies", "json"] }
 serde_json = "1"
 serde_urlencoded = "0.7"
 serde = { version = "1", features = ["derive"] }
