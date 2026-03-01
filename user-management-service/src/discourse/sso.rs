@@ -87,7 +87,7 @@ pub enum SsoResponseError {
     #[error("query parsing failed")]
     QueryParsing(#[from] serde_urlencoded::de::Error),
     #[error("digest verification failed")]
-    Verify(#[from] digest::MacError)
+    Verify(#[from] hmac::digest::MacError)
 }
 
 pub fn verify_sso_response(

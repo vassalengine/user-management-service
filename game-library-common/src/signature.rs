@@ -1,5 +1,7 @@
-use digest::MacError;
-use hmac::{Hmac, Mac};
+use hmac::{
+    Hmac, Mac,
+    digest::MacError
+};
 use sha2::Sha256;
 
 fn get_mac(secret: &[u8]) -> Hmac::<Sha256> {
