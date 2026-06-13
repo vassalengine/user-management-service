@@ -1,5 +1,5 @@
 use hmac::{
-    Hmac, Mac,
+    Hmac, KeyInit, Mac,
     digest::MacError
 };
 use sha2::Sha256;
