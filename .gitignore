@@ -1,0 +1,6 @@
+.*.swp
+config.toml
+/users.db
+/bak/
+/log/
+/target/
