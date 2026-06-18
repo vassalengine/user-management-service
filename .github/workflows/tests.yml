@@ -1,0 +1,38 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Update container
+        run: sudo apt update
+
+      - name: Install Rust nightly
+        run: rustup override set nightly
+
+      - name: Cache cargo
+        uses:  Swatinem/rust-cache@v2
+        id: cache-cargo
+
+      - name: Install sqlx
+        run: cargo install sqlx-cli --no-default-features --features sqlite
+
+      - name: Set up users database
+        run: |
+          cd user-management-service
+          DATABASE_URL=sqlite://users.db sqlx database setup
+
+      - name: Run tests
+        run: cargo test
