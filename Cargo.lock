@@ -900,6 +900,7 @@ dependencies = [
 [[package]]
 name = "glc"
 version = "0.1.0"
+source = "git+https://github.com/vassalengine/game-library-common.git#1ec839437a94a3ae64c18c6046bc3cc941d74a2e"
 dependencies = [
  "axum",
  "digest 0.11.3",
