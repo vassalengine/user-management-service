@@ -31,7 +31,6 @@ jobs:
 
       - name: Set up users database
         run: |
-          cd user-management-service
           DATABASE_URL=sqlite://users.db sqlx database setup
 
       - name: Run tests
