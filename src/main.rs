@@ -185,7 +185,7 @@ async fn run() -> Result<(), StartupError> {
     info!("Opening database {}", config.db_path);
     let db_pool = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(&format!("sqlite://{}", &config.db_path))
+        .connect(&format!("sqlite://{}", config.db_path))
         .await?;
 
     let core = ProdCore {
