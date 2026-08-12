@@ -21,7 +21,7 @@ glc = { git = "https://github.com/vassalengine/game-library-common.git" }
 hex = "0.4"
 hmac = "0.13"
 itertools = "0.15"
-jsonwebtoken = { version = "10", default-features = false, features = ["aws_lc_rs"] }
+jsonwebtoken = { version = "11", default-features = false, features = ["aws_lc_rs"] }
 mime = "0.3"
 rand = "0.10"
 reqwest = { version = "0.13", features = ["cookies", "json"] }
