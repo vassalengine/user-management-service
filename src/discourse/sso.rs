@@ -132,6 +132,8 @@ pub fn verify_sso_response(
 mod test {
     use super::*;
 
+    use std::assert_matches;
+
     #[test]
     fn build_sso_request_ok() {
         let url = build_sso_request_with_nonce(
@@ -173,46 +175,40 @@ mod test {
 
     #[test]
     fn verify_sso_response_urldecoding_error() {
-        assert!(
-            matches!(
-                verify_sso_response(
-                    b"12345",
-                    "abcde",
-                    "%FF",  // invalid UTF-8 byte!
-                    "xxx"
-                ).unwrap_err(),
-                SsoResponseError::URLDecoding(_)
-            )
+        assert_matches!(
+            verify_sso_response(
+                b"12345",
+                "abcde",
+                "%FF",  // invalid UTF-8 byte!
+                "xxx"
+            ).unwrap_err(),
+            SsoResponseError::URLDecoding(_)
         );
     }
 
     #[test]
     fn verify_sso_response_hex_decoding_error() {
-        assert!(
-            matches!(
-                verify_sso_response(
-                    b"12345",
-                    "abcde",
-                    "abcd",
-                    "abc"   // odd length!
-                ).unwrap_err(),
-                SsoResponseError::HexDecoding(_)
-            )
+        assert_matches!(
+            verify_sso_response(
+                b"12345",
+                "abcde",
+                "abcd",
+                "abc"   // odd length!
+            ).unwrap_err(),
+            SsoResponseError::HexDecoding(_)
         );
     }
 
     #[test]
     fn verify_sso_response_verify_error() {
-        assert!(
-            matches!(
-                verify_sso_response(
-                    b"12345",
-                    "abcde",
-                    "abcd",
-                    "abcd"  // bogus signature!
-                ).unwrap_err(),
-                SsoResponseError::Verify(_)
-            )
+        assert_matches!(
+            verify_sso_response(
+                b"12345",
+                "abcde",
+                "abcd",
+                "abcd"  // bogus signature!
+            ).unwrap_err(),
+            SsoResponseError::Verify(_)
         );
     }
 
@@ -227,11 +223,9 @@ mod test {
         let sig_bytes = make_signature(b64.as_bytes(), secret);
         let sig = hex::encode(sig_bytes);
 
-        assert!(
-            matches!(
-                verify_sso_response(secret, "abcde", &enc, &sig).unwrap_err(),
-                SsoResponseError::Base64Decoding(_)
-            )
+        assert_matches!(
+            verify_sso_response(secret, "abcde", &enc, &sig).unwrap_err(),
+            SsoResponseError::Base64Decoding(_)
         );
     }
 
@@ -241,11 +235,9 @@ mod test {
         let payload = "nonce=edcba";
         let (sso, sig) = encode_and_sign_payload(payload, secret);
 
-        assert!(
-            matches!(
-                verify_sso_response(secret, "abcde", &sso, &sig).unwrap_err(),
-                SsoResponseError::NonceMismatch
-            )
+        assert_matches!(
+            verify_sso_response(secret, "abcde", &sso, &sig).unwrap_err(),
+            SsoResponseError::NonceMismatch
         );
     }
 
@@ -256,11 +248,9 @@ mod test {
         let payload = format!("nonce={nonce}");
         let (sso, sig) = encode_and_sign_payload(&payload, secret);
 
-        assert!(
-            matches!(
-                verify_sso_response(secret, nonce, &sso, &sig).unwrap_err(),
-                SsoResponseError::MissingUsername
-            )
+        assert_matches!(
+            verify_sso_response(secret, nonce, &sso, &sig).unwrap_err(),
+            SsoResponseError::MissingUsername
         );
     }
 
@@ -271,11 +261,9 @@ mod test {
         let payload = format!("nonce={nonce}&username=bob");
         let (sso, sig) = encode_and_sign_payload(&payload, secret);
 
-        assert!(
-            matches!(
-                verify_sso_response(secret, nonce, &sso, &sig).unwrap_err(),
-                SsoResponseError::MissingUserId
-            )
+        assert_matches!(
+            verify_sso_response(secret, nonce, &sso, &sig).unwrap_err(),
+            SsoResponseError::MissingUserId
         );
     }
 }

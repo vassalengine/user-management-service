@@ -150,7 +150,7 @@ mod test {
     use const_format::concatcp;
     use reqwest::dns::{Name, Resolve, Resolving};
     use serde_json::json;
-    use std::io;
+    use std::{assert_matches, io};
     use wiremock::{MockServer, Mock, ResponseTemplate, matchers};
 
     async fn setup_server(
@@ -218,7 +218,7 @@ mod test {
             );
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, None);
         assert!(!err.message.is_empty());
@@ -232,7 +232,7 @@ mod test {
             );
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, None);
         assert!(!err.message.is_empty());
@@ -265,7 +265,7 @@ mod test {
             .set_body_string("this is not JSON");
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, None);
         assert!(!err.message.is_empty());
@@ -276,7 +276,7 @@ mod test {
         let rt = ResponseTemplate::new(201);
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, Some(201));
         assert_eq!(err.message, "");
@@ -287,7 +287,7 @@ mod test {
         let rt = ResponseTemplate::new(418);
 
         let result = do_get_csrf(rt).await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, Some(418));
     }
@@ -342,7 +342,7 @@ mod test {
             );
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, None);
         assert!(!err.message.is_empty());
@@ -360,7 +360,7 @@ mod test {
             .set_body_string("this is not JSON");
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, None);
         assert!(!err.message.is_empty());
@@ -384,7 +384,7 @@ mod test {
             );
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
-        assert!(matches!(result, Failure::Unauthorized));
+        assert_matches!(result, Failure::Unauthorized);
     }
 
     #[tokio::test]
@@ -398,7 +398,7 @@ mod test {
         let rt = ResponseTemplate::new(403);
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, Some(403));
         assert!(!err.message.is_empty());
@@ -415,7 +415,7 @@ mod test {
         let rt = ResponseTemplate::new(403);
 
         let result = do_post_login(rt, &params, "").await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, Some(403));
         assert!(!err.message.is_empty());
@@ -432,7 +432,7 @@ mod test {
         let rt = ResponseTemplate::new(500);
 
         let result = do_post_login(rt, &params, CSRF_COOKIE).await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, Some(500));
         assert!(!err.message.is_empty());
@@ -518,7 +518,7 @@ mod test {
         let dauth = DiscourseAuth::new(&mock_server.uri());
 
         let result = dauth.login("skroob", "12345").await.unwrap_err();
-        assert!(matches!(result, Failure::Unauthorized));
+        assert_matches!(result, Failure::Unauthorized);
     }
 
     struct NonResolver;
@@ -545,7 +545,7 @@ mod test {
         };
 
         let result = dauth.login("skroob", "12345").await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, None);
         assert!(!err.message.is_empty());
@@ -564,7 +564,7 @@ mod test {
         };
 
         let result = dauth.login("skroob", "12345").await.unwrap_err();
-        assert!(matches!(result, Failure::Error(_)));
+        assert_matches!(result, Failure::Error(_));
         let Failure::Error(err) = result else { unreachable!() };
         assert_eq!(err.status, None);
         assert!(!err.message.is_empty());
