@@ -35,7 +35,7 @@ time = "0.3"
 tokio = { version = "1", features = ["full"] }
 toml = "1.0"
 tower = { version = "0.5", features = ["limit", "util"] }
-tower-http = { version = "0.6", features = ["cors", "timeout", "trace"] }
+tower-http = { version = "0.7", features = ["cors", "timeout", "trace"] }
 tracing = "0.1"
 urlencoding = "2"
 

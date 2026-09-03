@@ -2710,11 +2710,9 @@ dependencies = [
  "http",
  "http-body",
  "pin-project-lite",
- "tokio",
  "tower",
  "tower-layer",
  "tower-service",
- "tracing",
  "url",
 ]
 
@@ -2883,7 +2881,7 @@ dependencies = [
  "tokio",
  "toml",
  "tower",
- "tower-http 0.6.11",
+ "tower-http 0.7.1",
  "tracing",
  "urlencoding",
  "wiremock",
